@@ -6,84 +6,7 @@
   <meta name="description" content="SmartLearn - Trasforma i tuoi appunti in flashcard e quiz con l'intelligenza artificiale">
   <meta name="author" content="Il Tuo Nome">
   <title>SmartLearn - Il Tuo Assistente Intelligente per lo Studio</title>
-  
-  <!-- Tailwind CSS CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  
-  <!-- Tailwind Config Personalizzato -->
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            primary: '#6366f1',
-            secondary: '#8b5cf6',
-          },
-          animation: {
-            'fade-in': 'fadeIn 0.5s ease-in',
-            'slide-up': 'slideUp 0.6s ease-out',
-            'bounce-slow': 'bounce 3s infinite',
-          },
-          keyframes: {
-            fadeIn: {
-              '0%': { opacity: '0' },
-              '100%': { opacity: '1' },
-            },
-            slideUp: {
-              '0%': { transform: 'translateY(20px)', opacity: '0' },
-              '100%': { transform: 'translateY(0)', opacity: '1' },
-            }
-          }
-        }
-      }
-    }
-  </script>
-  
-  <!-- Custom Styles -->
-  <style>
-    /* Gradient Background */
-    .gradient-bg {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    }
-    
-    /* Animated Gradient Text */
-    .gradient-text {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-    
-    /* Glassmorphism Effect */
-    .glass {
-      background: rgba(255, 255, 255, 0.1);
-      backdrop-filter: blur(10px);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-    }
-    
-    /* Smooth Scroll */
-    html {
-      scroll-behavior: smooth;
-    }
-    
-    /* Custom scrollbar */
-    ::-webkit-scrollbar {
-      width: 10px;
-    }
-    
-    ::-webkit-scrollbar-track {
-      background: #f1f5f9;
-    }
-    
-    ::-webkit-scrollbar-thumb {
-      background: #6366f1;
-      border-radius: 5px;
-    }
-    
-    ::-webkit-scrollbar-thumb:hover {
-      background: #4f46e5;
-    }
-  </style>
+  <link href="./src/output.css" rel="stylesheet">
 </head>
 
 <body class="bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
@@ -178,7 +101,7 @@
           </div>
           
           <!-- Stats -->
-            <div class="grid grid-cols-3 gap-8 mt-12 pt-8 border-t border-gray-200">
+          <div class="grid grid-cols-3 gap-8 mt-12 pt-8 border-t border-gray-200">
             <div>
               <div class="text-3xl font-bold text-indigo-600">100%</div>
               <div class="text-sm text-gray-600">Open Source</div>
@@ -192,7 +115,6 @@
               <div class="text-sm text-gray-600">Maturità</div>
             </div>
           </div>
-          
         </div>
         
         <!-- Right: Hero Image/Animation -->
@@ -670,7 +592,7 @@
     </div>
   </footer>
 
-  <!-- ============================================ -->
+<!-- ============================================ -->
   <!-- JAVASCRIPT -->
   <!-- ============================================ -->
   <script>
@@ -726,23 +648,68 @@
     // ============================================
     // Intersection Observer for Animations
     // ============================================
+    
+    // Configurazione observer
     const observerOptions = {
-      threshold: 0.1,
-      rootMargin: '0px 0px -50px 0px'
+      threshold: 0.15,  // Trigger quando 15% dell'elemento è visibile
+      rootMargin: '0px 0px -100px 0px'  // Trigger 100px prima che entri in viewport
     };
 
+    // Callback quando elemento entra in viewport
     const observer = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
+          // Aggiungi animazione
           entry.target.classList.add('animate-slide-up');
+          entry.target.classList.remove('opacity-0');
+          
+          // Smetti di osservare dopo animazione (performance)
+          observer.unobserve(entry.target);
         }
       });
     }, observerOptions);
 
-    // Observe all sections
-    document.querySelectorAll('section').forEach(section => {
-      observer.observe(section);
-    });
+    // Funzione per inizializzare animazioni al caricamento pagina
+    function initAnimations() {
+      // Seleziona tutti gli elementi da animare
+      const elementsToAnimate = [
+        // Hero section left
+        document.querySelector('.pt-32 .text-center.lg\\:text-left'),
+        // Hero section right
+        document.querySelector('.pt-32 .relative'),
+        // Features header
+        document.querySelector('#features .text-center.mb-16'),
+        // Roadmap header
+        document.querySelector('#roadmap .text-center.mb-16'),
+      ];
+
+      // Rimuovi null values e aggiungi classe iniziale
+      elementsToAnimate.forEach(el => {
+        if (el) {
+          el.classList.add('opacity-0');
+          observer.observe(el);
+        }
+      });
+
+      // Osserva tutte le feature card
+      document.querySelectorAll('#features .group').forEach(card => {
+        card.classList.add('opacity-0');
+        observer.observe(card);
+      });
+
+      // Osserva le roadmap card
+      document.querySelectorAll('#roadmap .bg-white.rounded-xl').forEach(card => {
+        card.classList.add('opacity-0');
+        observer.observe(card);
+      });
+    }
+
+    // Avvia animazioni quando DOM è pronto
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initAnimations);
+    } else {
+      initAnimations();
+    }
 
     // ============================================
     // Console Easter Egg
