@@ -71,8 +71,6 @@
   // HERO DEMO INTERACTION
   // ============================================
 
-  let selectedFile = null;
-
   // ============================================
   // FILE SELECTION
   // ============================================
@@ -137,7 +135,7 @@
   // FILE HANDLING
   // ============================================
 
-  function handleFile(file) {
+  async function handleFile(file) {
     // Validate file type
     const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
     if (!allowedTypes.includes(file.type)) {
@@ -151,8 +149,18 @@
       return;
     }
 
-    selectedFile = file;
     documentTitle.textContent = file.name;
+
+    const formData = new FormData();
+    formData.append('file', file);
+    const httpResponse = await inviaRichiesta("POST", "/upload", formData);
+
+    if(httpResponse.status == 200){
+      console.log(httpResponse.data)
+    }
+    else
+      alert(httpResponse.status + " : " + httpResponse.err)
+
 
     // Auto-start demo dopo 500ms
     setTimeout(() => {
@@ -246,7 +254,6 @@
     tryAgainBtn.addEventListener('click', () => {
       resultsState.classList.add('hidden');
       uploadArea.classList.remove('hidden');
-      selectedFile = null;
       fileInput.value = '';
       filePreview.classList.add('hidden');
     });

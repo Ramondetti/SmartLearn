@@ -7,19 +7,21 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "tsx server.ts"
   },
-  "keywords": [
-
-  ],
+  "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@google-cloud/vision": "^5.3.4",
+    "@google/genai": "^1.43.0",
+    "axios": "^1.13.6",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "mime": "^1.6.0",
     "mongodb": "^6.20.0",
+    "multer": "^2.1.0",
     "nodemon": "^3.1.10",
+    "openai": "^6.25.0",
+    "pdfjs-dist": "^5.5.207",
     "ts-node": "^10.9.2",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2"
@@ -27,6 +29,7 @@
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
+    "@types/multer": "^2.0.0",
     "@types/node": "^24.5.2"
   }
 }
