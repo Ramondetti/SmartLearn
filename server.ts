@@ -147,31 +147,58 @@ app.post("/api/upload", upload.single("file"),async function(req, res) {
 
          extractedTextFromPdf = extractedTextFromPdf.replace(/\s+/g, " ").trim();
 
-         let response
+         let responseFlashCard
+         let rispostaFlashcard = ""
          const MAX_CHARS = 70000;
          for (let i = 0; i < extractedTextFromPdf.length; i+=MAX_CHARS) {
             let extractedText = extractedTextFromPdf.substring(i, i+MAX_CHARS);
 
-            const prompt = `Genera quante più flashcard che abbiano senso di livello avanzato dal testo seguente.
-            Rispondi SOLO con un array JSON valido.
+            const promptFlashcard = `Genera quante più flashcard che abbiano senso di livello avanzato dal testo seguente.
+            Rispondi SOLO con un array JSON VALIDO senza altre scritte solo l'array senza backtick e apici.
 
+            se il testo è povero di contenuto restituisci un []
             Formato:
             [
             { "front": "...", "back": "..." }
             ]
 
-            TESTO:, 
-            se il testo è povero di contenuto restituisci un [] " ${extractedText}`
+            TESTO: " ${extractedText}`
 
-        response = await genAI.models.generateContent({
+        responseFlashCard = await genAI.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: prompt
+        contents: promptFlashcard
         });
-        console.log(response.text)
-
+        console.log(responseFlashCard.text)
+        rispostaFlashcard+=responseFlashCard.text
          }
-         console.log("FINITO")
-        res.send({text:response?.text}); 
+         console.log("FINITA GENERAZIONE FLASHCARD")
+        let responseQuiz
+        let rispostaQuiz = ""
+
+        for (let i = 0; i < extractedTextFromPdf.length; i+=MAX_CHARS) {
+            let extractedText = extractedTextFromPdf.substring(i, i+MAX_CHARS);
+
+            const promptQuiz = `Crea quanti più quiz possibili di alto livello e che abbiano senso, a 
+            risposta multipla.
+
+            IMPORTANTE: Rispondi SOLO con array JSON VALIDO senza altre scritte solo l'array senza backtick e apici.
+            se il testo è povero di contenuto restituisci un []
+
+            FORMATO:
+            [{"question": "?", "options": ["A","B","C","D"], "correct": 0}]
+
+            TESTO: " ${extractedText}`
+
+            responseQuiz = await genAI.models.generateContent({
+            model: "gemini-3-flash-preview",
+            contents: promptQuiz
+            });
+            console.log(responseQuiz.text)
+            rispostaQuiz+=responseQuiz.text
+         }
+
+        console.log("FINITA GENERAZIONE QUIZ")
+        res.send({flashcard:rispostaFlashcard ,quiz:rispostaQuiz}); 
     } 
     catch (error:any) { 
         console.error("Errore server:", error); 

@@ -96,40 +96,59 @@
     }
   });
 
+  //NON FUNZIONA
   // ============================================
   // DRAG & DROP
   // ============================================
 
-  // Prevent default drag behaviors
-  ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-    dropZone.addEventListener(eventName, preventDefaults, false);
-  });
+// click per aprire file picker
+dropZone.addEventListener("click", () => {
+    fileInput.click();
+});
+
+// quando trascini sopra
+dropZone.addEventListener("dragover", (e) => {
+    e.preventDefault();
+
+    dropZone.classList.add(
+        "border-blue-500",
+        "bg-blue-50",
+        "scale-105"
+    );
+});
+
+// quando esci
+dropZone.addEventListener("dragleave", () => {
+    dropZone.classList.remove(
+        "border-blue-500",
+        "bg-blue-50",
+        "scale-105"
+    );
+});
+
+// quando rilasci
+dropZone.addEventListener("drop", (e) => {
+    e.preventDefault();
+
+    dropZone.classList.remove(
+        "border-blue-500",
+        "bg-blue-50",
+        "scale-105"
+    );
+
+    const file = e.dataTransfer.files[0]
+    if (file) {
+      handleFile(file)
+      homepage.classList.add("hidden")
+      sezioneResults.classList.remove("hidden")
+    }
+    
+});
 
   function preventDefaults(e) {
     e.preventDefault();
     e.stopPropagation();
   }
-
-  // Highlight drop zone when dragging over it
-  ['dragenter', 'dragover'].forEach(eventName => {
-    dropZone.addEventListener(eventName, () => {
-      dropZone.classList.add('border-indigo-500', 'bg-indigo-50');
-    });
-  });
-
-  ['dragleave', 'drop'].forEach(eventName => {
-    dropZone.addEventListener(eventName, () => {
-      dropZone.classList.remove('border-indigo-500', 'bg-indigo-50');
-    });
-  });
-
-  // Handle dropped files
-  dropZone.addEventListener('drop', (e) => {
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-      handleFile(files[0]);
-    }
-  });
 
   // ============================================
   // FILE HANDLING
@@ -157,15 +176,22 @@
 
     if(httpResponse.status == 200){
       console.log(httpResponse.data)
+      const flashcards = JSON.parse(httpResponse.data.flashcard)
+      const quiz = JSON.parse(httpResponse.data.quiz)
+      console.log(flashcards)
+      divElaborazioneCompletata.classList.remove("hidden")
+      divElaborazioneCompletata.classList.add("inline-flex")
+      divCreazione.classList.remove("hidden")
+      divFlashcard.classList.remove("hidden")
+      divQuiz.classList.remove("hidden")
+      divTutorAi.classList.remove("hidden")
+      buttons.classList.remove("hidden")
+      buttons.classList.add("flex")
+      flashcardCount.textContent = flashcards.length
+      quizCount.textContent = quiz.length
     }
     else
       alert(httpResponse.status + " : " + httpResponse.err)
-
-
-    // Auto-start demo dopo 500ms
-    setTimeout(() => {
-      startDemo();
-    }, 500);
   }
 
   function formatFileSize(bytes) {
@@ -174,75 +200,6 @@
     const sizes = ['Bytes', 'KB', 'MB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
-  }
-
-  // ============================================
-  // DEMO ANIMATION
-  // ============================================
-
-  const progressSteps = [
-    { progress: 20, text: 'Caricamento file...' },
-    { progress: 40, text: 'Estrazione testo (OCR)...' },
-    { progress: 60, text: 'Analisi contenuto AI...' },
-    { progress: 80, text: 'Generazione flashcard...' },
-    { progress: 95, text: 'Creazione quiz...' },
-    { progress: 100, text: 'Completato!' }
-  ];
-
-  let currentStep = 0;
-
-  function startDemo() {
-    // Nascondi upload area
-    uploadArea.classList.add('hidden');
-    
-    // Mostra processing
-    processingState.classList.remove('hidden');
-    
-    // Resetta progresso
-    currentStep = 0;
-    progressBar.style.width = '0%';
-    
-    // Anima progresso
-    animateProgress();
-  }
-
-  function animateProgress() {
-    if (currentStep < progressSteps.length) {
-      const step = progressSteps[currentStep];
-      
-      // Aggiorna UI
-      progressBar.style.width = step.progress + '%';
-      progressText.textContent = step.text;
-      
-      currentStep++;
-      
-      // Prossimo step
-      setTimeout(animateProgress, 600);
-    } else {
-      // Fine processing, mostra risultati
-      setTimeout(showResults, 300);
-    }
-  }
-
-  function showResults() {
-    // Nascondi processing
-    processingState.classList.add('hidden');
-    
-    // Mostra risultati con animazione
-    resultsState.classList.remove('hidden');
-    
-    // Anima le card una alla volta
-    const cards = resultsState.querySelectorAll('.group');
-    cards.forEach((card, index) => {
-      card.style.opacity = '0';
-      card.style.transform = 'translateY(20px)';
-      
-      setTimeout(() => {
-        card.style.transition = 'all 0.5s ease-out';
-        card.style.opacity = '1';
-        card.style.transform = 'translateY(0)';
-      }, index * 150);
-    });
   }
 
   // ============================================
