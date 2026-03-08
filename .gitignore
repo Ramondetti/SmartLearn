@@ -399,3 +399,4 @@ FodyWeavers.xsd
 
 .env
 google-credentials.json
+static/uploads

@@ -1,0 +1,140 @@
+import 'animate.css';
+.loader {
+width: 50px;
+padding: 8px;
+aspect-ratio: 1;
+border-radius: 50%;
+background: #25b09b;
+--_m: 
+  conic-gradient(#0000 10%,#000),
+  linear-gradient(#000 0 0) content-box;
+-webkit-mask: var(--_m);
+        mask: var(--_m);
+-webkit-mask-composite: source-out;
+        mask-composite: subtract;
+animation: l3 1s infinite linear;
+}
+
+@keyframes l3 {to{transform: rotate(1turn)}}
+
+@keyframes spinSlow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin-slow{
+  animation: spinSlow 6s linear infinite;
+}
+
+   /* ── Keyframes ── */
+    @keyframes slide-up {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fade-in {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    @keyframes mesh-drift {
+      0%,100% { transform: translate(0,0) scale(1); }
+      33%      { transform: translate(-30px, 20px) scale(1.06); }
+      66%      { transform: translate(20px, -15px) scale(.97); }
+    }
+    @keyframes orb-breathe {
+      0%,100% { transform: scale(1);    opacity: .9; }
+      50%      { transform: scale(1.08); opacity: 1; }
+    }
+    @keyframes ring-cw  { to { transform: rotate(360deg); } }
+    @keyframes ring-ccw { to { transform: rotate(-360deg); } }
+    @keyframes bar-grow {
+      0%  { width: 0%; }
+      12% { width: 9%; }
+      30% { width: 28%; }
+      52% { width: 51%; }
+      74% { width: 72%; }
+      90% { width: 87%; }
+     100% { width: 100%; }
+    }
+    @keyframes bar-sheen {
+      0%   { background-position: 200% center; }
+      100% { background-position: -200% center; }
+    }
+    @keyframes dot-blink {
+      0%,100% { opacity: .25; transform: scale(.7); }
+      50%      { opacity: 1;   transform: scale(1.1); }
+    }
+    @keyframes status-change {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Applied animations ── */
+    .anim-up-0 { animation: slide-up .65s .05s both cubic-bezier(.22,1,.36,1); }
+    .anim-up-1 { animation: slide-up .65s .15s both cubic-bezier(.22,1,.36,1); }
+    .anim-up-2 { animation: slide-up .65s .28s both cubic-bezier(.22,1,.36,1); }
+    .anim-up-3 { animation: slide-up .65s .40s both cubic-bezier(.22,1,.36,1); }
+    .anim-up-4 { animation: slide-up .65s .52s both cubic-bezier(.22,1,.36,1); }
+    .anim-up-5 { animation: slide-up .65s .64s both cubic-bezier(.22,1,.36,1); }
+    .anim-fade { animation: fade-in  .5s  .1s  both; }
+
+    .mesh-1 { animation: mesh-drift  9s ease-in-out -1s  infinite; }
+    .mesh-2 { animation: mesh-drift 11s ease-in-out -4s  infinite; }
+    .mesh-3 { animation: mesh-drift 14s ease-in-out -8s  infinite; }
+
+    .orb-breathe { animation: orb-breathe 3s ease-in-out infinite; }
+    .ring-cw     { animation: ring-cw  3s linear infinite; }
+    .ring-ccw    { animation: ring-ccw 5s linear infinite; }
+
+    /* Progress bar */
+    .bar-fill {
+      height: 100%;
+      border-radius: 9999px;
+      background: linear-gradient(90deg, #6366f1, #8b5cf6, #a78bfa, #6366f1);
+      background-size: 300% 100%;
+      width: 0%;
+      animation:
+        bar-grow  3.9s cubic-bezier(.4,0,.2,1) forwards,
+        bar-sheen 1.8s linear infinite;
+    }
+
+    /* Gradient text */
+    .grad-text {
+      background: linear-gradient(125deg, #4f46e5 0%, #7c3aed 50%, #6366f1 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .grad-text-accent {
+      background: linear-gradient(125deg, #6366f1, #8b5cf6, #c084fc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* Step states — toggled via JS */
+    .step-idle   { background:#f8f9fc; border-color:#eef0f6; color:#b0b7c9; }
+    .step-active { background:linear-gradient(135deg,#eef2ff,#f5f3ff); border-color:#c7d2fe; color:#4338ca; }
+    .step-done   { background:linear-gradient(135deg,#f0fdf4,#ecfdf5); border-color:#bbf7d0; color:#166534; }
+
+    .icon-idle   { background:#eef0f6; color:#c4c9d8; }
+    .icon-active { background:linear-gradient(135deg,#6366f1,#8b5cf6); color:#fff; }
+    .icon-done   { background:linear-gradient(135deg,#22c55e,#16a34a); color:#fff; }
+    .icon-active-pulse { animation: dot-blink 1s ease-in-out infinite; }
+
+    .status-change { animation: status-change .35s ease both; }
+
+    /* Dot loader (3 dots under status) */
+    .dot { animation: dot-blink 1.2s ease-in-out infinite; }
+    .dot:nth-child(2) { animation-delay: .2s; }
+    .dot:nth-child(3) { animation-delay: .4s; }
+
+    @keyframes fadeInDown {
+   0% {
+      opacity: 0;
+      transform: translateY(-20px);
+   }
+   100% {
+      opacity: 1;
+      transform: translateY(0);
+   }
+} 

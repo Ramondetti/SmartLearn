@@ -11,6 +11,7 @@ import cors from "cors"
 import multer from 'multer'
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { GoogleGenAI } from "@google/genai";
+import { Console } from "console"
 
 //grazie a @type di express, visual studio riconosce implicitamente i tipi e li associa
 //automaticamente
@@ -125,85 +126,117 @@ const corsOptions = {
 app.use("/", cors(corsOptions));
 
 //E. gestione delle risorse dinamiche
-app.post("/api/upload", upload.single("file"),async function(req, res) {
+app.post("/api/upload", upload.single("file"), async function(req, res) {
+    // ── Setup SSE ──
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders();
+
+    // Helper per mandare eventi al client
+    const sendEvent = (step: number, pct: number, msg: string) => {
+        res.write(`data: ${JSON.stringify({ step, pct, msg })}\n\n`);
+    };
+
     try {
-        const filePath:any = req.file?.path;
+        const filePath: any = req.file?.path;
         const mimeType = req.file?.mimetype;
 
         if (mimeType !== "application/pdf") {
             fs.unlinkSync(filePath);
-            return res.status(400).json({ error: "Solo PDF supportati" });
+            res.write(`data: ${JSON.stringify({ error: "Solo PDF supportati" })}\n\n`);
+            return res.end();
         }
+
+        // ── Step 1: Lettura PDF ──
+        sendEvent(1, 10, "Lettura del file PDF...");
         const dataBuffer = await fs.promises.readFile(filePath);
         const uint8Array = new Uint8Array(dataBuffer);
         const pdf = await pdfjsLib.getDocument({ data: uint8Array }).promise;
 
-        let extractedTextFromPdf = ""
+        // ── Step 2: Estrazione testo ──
+        sendEvent(1, 20, "Estrazione testo in corso...");
+        let extractedTextFromPdf = "";
         for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
             const content = await page.getTextContent();
             extractedTextFromPdf += content.items.map((item: any) => item.str).join(" ") + "\n";
+
+            // Aggiorna il progresso pagina per pagina
+            const pct = 20 + Math.round((i / pdf.numPages) * 15);
+            sendEvent(1, pct, `Analisi pagina ${i} di ${pdf.numPages}...`);
         }
+        extractedTextFromPdf = extractedTextFromPdf.replace(/\s+/g, " ").trim();
+        sendEvent(1, 35, "Testo estratto con successo ✓");
 
-         extractedTextFromPdf = extractedTextFromPdf.replace(/\s+/g, " ").trim();
+        // ── Step 3: Generazione Flashcard ──
+        const MAX_CHARS = 70000;
+        const chunksCount = Math.ceil(extractedTextFromPdf.length / MAX_CHARS);
+        let rispostaFlashcard = "";
 
-         let responseFlashCard
-         let rispostaFlashcard = ""
-         const MAX_CHARS = 70000;
-         for (let i = 0; i < extractedTextFromPdf.length; i+=MAX_CHARS) {
-            let extractedText = extractedTextFromPdf.substring(i, i+MAX_CHARS);
+        for (let i = 0; i < extractedTextFromPdf.length; i += MAX_CHARS) {
+            const chunkIndex = Math.floor(i / MAX_CHARS) + 1;
+            const pct = 35 + Math.round((chunkIndex / chunksCount) * 30);
+            sendEvent(2, pct, `Generazione flashcard (parte ${chunkIndex}/${chunksCount})...`);
 
+            const extractedText = extractedTextFromPdf.substring(i, i + MAX_CHARS);
             const promptFlashcard = `Genera quante più flashcard che abbiano senso di livello avanzato dal testo seguente.
             Rispondi SOLO con un array JSON VALIDO senza altre scritte solo l'array senza backtick e apici.
-
             se il testo è povero di contenuto restituisci un []
-            Formato:
-            [
-            { "front": "...", "back": "..." }
-            ]
+            Formato: [{ "front": "...", "back": "..." }]
+            TESTO: "${extractedText}"`;
 
-            TESTO: " ${extractedText}`
-
-        responseFlashCard = await genAI.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: promptFlashcard
-        });
-        console.log(responseFlashCard.text)
-        rispostaFlashcard+=responseFlashCard.text
-         }
-         console.log("FINITA GENERAZIONE FLASHCARD")
-        let responseQuiz
-        let rispostaQuiz = ""
-
-        for (let i = 0; i < extractedTextFromPdf.length; i+=MAX_CHARS) {
-            let extractedText = extractedTextFromPdf.substring(i, i+MAX_CHARS);
-
-            const promptQuiz = `Crea quanti più quiz possibili di alto livello e che abbiano senso, a 
-            risposta multipla.
-
-            IMPORTANTE: Rispondi SOLO con array JSON VALIDO senza altre scritte solo l'array senza backtick e apici.
-            se il testo è povero di contenuto restituisci un []
-
-            FORMATO:
-            [{"question": "?", "options": ["A","B","C","D"], "correct": 0}]
-
-            TESTO: " ${extractedText}`
-
-            responseQuiz = await genAI.models.generateContent({
-            model: "gemini-3-flash-preview",
-            contents: promptQuiz
+            const responseFlashCard = await genAI.models.generateContent({
+                model: "gemini-3-flash-preview",
+                contents: promptFlashcard
             });
-            console.log(responseQuiz.text)
-            rispostaQuiz+=responseQuiz.text
-         }
+            rispostaFlashcard += responseFlashCard.text;
+        }
+        sendEvent(2, 65, "Flashcard generate con successo ✓");
+        console.log("FLASHCARD GENERATE")
 
-        console.log("FINITA GENERAZIONE QUIZ")
-        res.send({flashcard:rispostaFlashcard ,quiz:rispostaQuiz}); 
-    } 
-    catch (error:any) { 
-        console.error("Errore server:", error); 
-        res.status(500).send(error.message) 
-    } 
+        // ── Step 4: Generazione Quiz ──
+        let rispostaQuiz = "";
+
+        for (let i = 0; i < extractedTextFromPdf.length; i += MAX_CHARS) {
+            const chunkIndex = Math.floor(i / MAX_CHARS) + 1;
+            const pct = 65 + Math.round((chunkIndex / chunksCount) * 30);
+            sendEvent(3, pct, `Generazione quiz (parte ${chunkIndex}/${chunksCount})...`);
+
+            const extractedText = extractedTextFromPdf.substring(i, i + MAX_CHARS);
+            const promptQuiz = `Crea quanti più quiz possibili di alto livello e che abbiano senso, a risposta multipla.
+            IMPORTANTE: Rispondi SOLO con array JSON VALIDO senza altre scritte solo l'array senza backtick,senza spazi bianchi e apici.
+            se il testo è povero di contenuto restituisci un []
+            ASSICURATI CHE IL JSON SIA CORRETTO E NON CI SIANO SPAZI BIANCHI
+            FORMATO: [{"question": "?", "options": ["A","B","C","D"], "correct": 0}]
+            TESTO: "${extractedText}"`;
+
+            const responseQuiz = await genAI.models.generateContent({
+                model: "gemini-3-flash-preview",
+                contents: promptQuiz
+            });
+            rispostaQuiz += responseQuiz.text;
+        }
+        sendEvent(3, 95, "Quiz generati con successo ✓");
+        console.log("QUIZ GENERATI")
+
+        // ── Step finale: manda i dati ──
+        sendEvent(4, 100, "Tutto pronto! 🚀");
+        res.write(`data: ${JSON.stringify({
+            done: true,
+            flashcard: rispostaFlashcard,
+            quiz: rispostaQuiz
+        })}\n\n`);
+        res.end();
+
+        // Pulisci il file uploadato
+        fs.unlinkSync(filePath);
+
+    } catch (error: any) {
+        console.error("Errore server:", error);
+        res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+        res.end();
+    }
 });
 
 app.get("/api/:collection",async function(req:any,res,next) {
