@@ -1,5 +1,10 @@
 "use strict"
 
+let flashcardGlobal = []
+var currentIndex = 0;
+var isFlipped = false;
+var viewMode = "single";
+
 // ============================================
 // Mobile Menu Toggle
 // ============================================
@@ -246,6 +251,8 @@ async function handleFile(file) {
       if (data.done) {
         try {
           const flashcards = JSON.parse(data.flashcard);
+          console.log(flashcards)
+          flashcardGlobal = flashcards
           const quiz = JSON.parse(data.quiz);
 
           showDone();
@@ -263,6 +270,9 @@ async function handleFile(file) {
           flashcardCount.textContent = flashcards.length;
           quizCount.textContent = quiz.length;
           loadingSection.classList.add("hidden")
+          nomeDocumento.classList.remove("hidden")
+          results.classList.remove("py-10")
+          results.classList.add("py-16")
           window.flashcardsData = flashcards
           window.quizData = quiz
         } catch (parseErr) {
@@ -277,7 +287,343 @@ async function handleFile(file) {
 // BUTTONS
 // ============================================
 
-scaricaQuizFlashcards.addEventListener("click",scaricaTutto)
+// ============================================
+// EVENT LISTENERS
+// ============================================
+
+scaricaQuizFlashcards.addEventListener("click", scaricaTutto);
+
+showFlashcard.addEventListener("click", function() {
+    // Nascondi results, mostra flashcard section
+    sezioneResults.classList.add("hidden");
+    flashcardsSection.classList.remove("hidden");
+    
+    // Popola dati globali se non già fatto
+    if (flashcardGlobal.length === 0 && generatedData?.flashcards) {
+        flashcardGlobal = generatedData.flashcards;
+    }
+    
+    // Reset index
+    currentIndex = 0;
+    isFlipped = false;
+    
+    // Update header
+    flashcardCountFlashcardSection.textContent = flashcardGlobal.length + " Flashcard Generate";
+    totalNum.textContent = flashcardGlobal.length;
+    currentNum.textContent = "1";
+    
+    // Render prima card
+    renderCard();
+});
+
+btnStudio.addEventListener("click", function() {
+    singleView.classList.remove("hidden");
+    gridView.classList.add("hidden");
+    
+    // Update button styles
+    btnStudio.classList.add("bg-indigo-600", "text-white");
+    btnStudio.classList.remove("bg-white", "border-2", "border-gray-300", "text-gray-700");
+    
+    btnGrid.classList.remove("bg-indigo-600", "text-white");
+    btnGrid.classList.add("bg-white", "border-2", "border-gray-300", "text-gray-700");
+});
+
+btnGrid.addEventListener("click", function() {
+    singleView.classList.add("hidden");
+    gridView.classList.remove("hidden");
+    gridView.classList.add("grid")
+    
+    // Update button styles
+    btnGrid.classList.add("bg-indigo-600", "text-white");
+    btnGrid.classList.remove("bg-white", "border-2", "border-gray-300", "text-gray-700");
+    
+    btnStudio.classList.remove("bg-indigo-600", "text-white");
+    btnStudio.classList.add("bg-white", "border-2", "border-gray-300", "text-gray-700");
+    
+    // Render grid view
+    renderGridView();
+});
+
+// ============================================
+// RENDER CARD (crea HTML)
+// ============================================
+
+function renderCard() {
+    if (flashcardGlobal.length === 0) {
+        flashcardView.innerHTML = '<p class="text-center text-gray-500">Nessuna flashcard disponibile</p>';
+        return;
+    }
+    
+    const card = flashcardGlobal[currentIndex];
+    
+    flashcardView.innerHTML = `
+    <div id="flashcardContainer" 
+         class="relative w-full min-h-72 sm:min-h-80 max-h-80 sm:max-h-96 cursor-pointer transition-transform duration-500" 
+         style="transform-style: preserve-3d;">
+        
+        <!-- Front -->
+        <div class="card-face absolute inset-0 flex items-center justify-center rounded-2xl border-2 border-indigo-100 bg-linear-to-br from-white to-indigo-50 p-6 sm:p-8 shadow-lg overflow-y-auto" 
+             style="backface-visibility: hidden;">
+            <div class="text-center w-full">
+                <div class="mb-3 sm:mb-4 inline-flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-indigo-100 shrink-0">
+                    <svg class="h-5 w-5 sm:h-6 sm:w-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+                <p id="questionText" class="text-lg sm:text-xl font-medium text-gray-800 leading-relaxed wrap-break-word hyphens-auto px-2">${card.front}</p>
+                <p class="mt-3 sm:mt-4 text-xs sm:text-sm text-gray-400 shrink-0">Clicca per vedere la risposta</p>
+            </div>
+        </div>
+
+        <!-- Back -->
+        <div class="card-face card-back absolute inset-0 rounded-2xl border-2 border-purple-100 bg-linear-to-br from-indigo-600 to-purple-600 shadow-lg overflow-y-auto" 
+             style="backface-visibility: hidden; transform: rotateY(180deg);">
+            <div class="p-4 sm:p-6 md:p-8 h-full flex flex-col">
+                <div class="flex flex-col items-center justify-center flex-1 min-h-0">
+                    <div class="mb-3 sm:mb-4 inline-flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-white/20 shrink-0">
+                        <svg class="h-5 w-5 sm:h-6 sm:w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <div class="w-full text-center overflow-y-auto flex-1 px-2">
+                        <p id="answerText" class="text-sm sm:text-base md:text-lg font-semibold text-white leading-relaxed wrap-break-word hyphens-auto whitespace-pre-wrap">${card.back}</p>
+                    </div>
+                    <p class="mt-3 sm:mt-4 text-xs sm:text-sm text-white/70 shrink-0">Clicca per tornare alla domanda</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    `;
+    
+    // Aggiungi event listener
+    const cardContainer = document.getElementById('flashcardContainer');
+    if (cardContainer) {
+        cardContainer.addEventListener('click', flipCard);
+    }
+}
+
+// ============================================
+// FLIP CARD (gira la carta)
+// ============================================
+
+function flipCard() {
+    const cardContainer = document.getElementById('flashcardContainer');
+    if (!cardContainer) return;
+    
+    isFlipped = !isFlipped;
+    
+    if (isFlipped) {
+        cardContainer.style.transform = "rotateY(180deg)";
+    } else {
+        cardContainer.style.transform = "rotateY(0deg)";
+    }
+}
+
+// ============================================
+// NEXT FLASHCARD (carta successiva)
+// ============================================
+
+nextFlashcard.addEventListener("click", function() {
+    // Reset flip state
+    isFlipped = false;
+    
+    // Incrementa index (con loop)
+    currentIndex = (currentIndex + 1) % flashcardGlobal.length;
+    
+    // Re-render card
+    renderCard();
+    
+    // Update UI
+    currentNum.textContent = currentIndex + 1;
+});
+
+// ============================================
+// PREVIOUS FLASHCARD (carta precedente)
+// ============================================
+
+prevFlashcard.addEventListener("click", function() {
+    // Reset flip state
+    isFlipped = false;
+    
+    // Decrementa index (con loop)
+    currentIndex = (currentIndex - 1 + flashcardGlobal.length) % flashcardGlobal.length;
+    
+    // Re-render card
+    renderCard();
+    
+    // Update UI
+    currentNum.textContent = currentIndex + 1;
+});
+
+// ============================================
+// PROGRESS DOTS CON FINESTRA SCORREVOLE
+// ============================================
+
+function createDot(index, isActive) {
+    const dot = document.createElement('div');
+    
+    if (isActive) {
+        dot.className = "h-2 w-6 rounded-full bg-indigo-600 transition-all flex-shrink-0";
+    } else {
+        dot.className = "h-2 w-2 rounded-full bg-gray-300 hover:bg-gray-400 transition-all cursor-pointer flex-shrink-0";
+        dot.addEventListener('click', () => {
+            isFlipped = false;
+            currentIndex = index;
+            renderCard();
+            currentNum.textContent = currentIndex + 1;
+        });
+    }
+}
+
+// ============================================
+// RENDER VISTA GRIGLIA
+// ============================================
+
+function renderGridView() {
+    if (flashcardGlobal.length === 0) {
+        gridView.innerHTML = '<p class="text-center text-gray-500">Nessuna flashcard disponibile</p>';
+        return;
+    }
+    
+    gridView.innerHTML = '';
+    
+    const gridContainer = document.createElement('div');
+    gridContainer.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full auto-rows-fr';
+    
+    flashcardGlobal.forEach((card, index) => {
+        const cardElement = document.createElement('div');
+        cardElement.className = 'min-w-0 w-full group bg-white rounded-xl border-2 border-gray-200 hover:border-indigo-500 overflow-hidden transition-all cursor-pointer shadow-sm hover:shadow-lg';
+        cardElement.onclick = () => openCardModal(index);
+        
+        cardElement.innerHTML = `
+            <!-- Header -->
+            <div class="bg-linear-to-r from-indigo-500 to-purple-600 px-4 py-3 flex items-center justify-between w-full">
+                <span class="text-white font-bold text-sm">Card ${index + 1}</span>
+                <svg class="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                </svg>
+            </div>
+            
+            <!-- Question Preview -->
+            <div class="p-4 w-full">
+                <div class="flex items-start gap-2 mb-3 w-full">
+                    <svg class="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <p class="text-sm font-medium text-gray-800 line-clamp-3 flex-1 min-w-0">${card.front}</p>
+                </div>
+                
+                <!-- Answer Preview -->
+                <div class="border-t border-gray-100 pt-3 mt-3 w-full">
+                    <div class="flex items-center gap-2 text-xs text-gray-500">
+                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        </svg>
+                        <span>Clicca per vedere la risposta</span>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        gridContainer.appendChild(cardElement);
+    });
+    
+    gridView.appendChild(gridContainer);
+}
+
+// ============================================
+// MODAL CARD
+// ============================================
+
+function openCardModal(index) {
+    const card = flashcardGlobal[index];
+    
+    const modal = document.createElement('div');
+    modal.id = 'cardModal';
+    modal.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4';
+    modal.onclick = (e) => {
+        if (e.target === modal) closeCardModal();
+    };
+    
+    modal.innerHTML = `
+        <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto" onclick="event.stopPropagation()">
+            <!-- Header -->
+            <div class="bg-linear-to-r from-indigo-500 to-purple-600 px-6 py-4 flex items-center justify-between rounded-t-2xl">
+                <h3 class="text-white font-bold text-lg">Flashcard ${index + 1} / ${flashcardGlobal.length}</h3>
+                <button onclick="closeCardModal()" class="hover:cursor-pointer text-white hover:bg-white/20 rounded-lg p-2 transition">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            
+            <!-- Content -->
+            <div class="p-6">
+                <!-- Question -->
+                <div class="mb-6">
+                    <div class="flex items-center gap-2 mb-3">
+                        <div class="bg-indigo-100 p-2 rounded-lg">
+                            <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                        <span class="text-sm font-medium text-gray-500">Domanda</span>
+                    </div>
+                    <p class="text-lg font-medium text-gray-900 leading-relaxed">${card.front}</p>
+                </div>
+                
+                <!-- Divider -->
+                <div class="border-t border-gray-200 my-6"></div>
+                
+                <!-- Answer -->
+                <div>
+                    <div class="flex items-center gap-2 mb-3">
+                        <div class="bg-green-100 p-2 rounded-lg">
+                            <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                        <span class="text-sm font-medium text-gray-500">Risposta</span>
+                    </div>
+                    <p class="text-lg text-gray-800 leading-relaxed">${card.back}</p>
+                </div>
+            </div>
+            
+            <!-- Footer -->
+            <div class="bg-gray-50 px-6 py-4 flex gap-3 rounded-b-2xl">
+                ${index > 0 ? `
+                    <button onclick="closeCardModal(); openCardModal(${index - 1})" class="hover:cursor-pointer flex-1 px-4 py-2 bg-white border-2 border-gray-300 rounded-lg hover:border-indigo-500 transition flex items-center justify-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                        </svg>
+                        <span>Precedente</span>
+                    </button>
+                ` : '<div class="flex-1"></div>'}
+                
+                ${index < flashcardGlobal.length - 1 ? `
+                    <button onclick="closeCardModal(); openCardModal(${index + 1})" class="hover:cursor-pointer flex-1 px-4 py-2 bg-white border-2 border-gray-300 rounded-lg hover:border-indigo-500 transition flex items-center justify-center gap-2">
+                        <span>Successiva</span>
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                    </button>
+                ` : '<div class="flex-1"></div>'}
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    document.body.style.overflow = 'hidden';
+}
+
+function closeCardModal() {
+    const modal = document.getElementById('cardModal');
+    if (modal) {
+        modal.remove();
+        document.body.style.overflow = '';
+    }
+}
 
 if (tryAgainBtn) {
   tryAgainBtn.addEventListener('click', () => {

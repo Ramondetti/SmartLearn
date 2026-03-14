@@ -11,7 +11,6 @@ import cors from "cors"
 import multer from 'multer'
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { GoogleGenAI } from "@google/genai";
-import { Console } from "console"
 
 //grazie a @type di express, visual studio riconosce implicitamente i tipi e li associa
 //automaticamente
@@ -204,12 +203,25 @@ app.post("/api/upload", upload.single("file"), async function(req, res) {
             sendEvent(3, pct, `Generazione quiz (parte ${chunkIndex}/${chunksCount})...`);
 
             const extractedText = extractedTextFromPdf.substring(i, i + MAX_CHARS);
-            const promptQuiz = `Crea quanti più quiz possibili di alto livello e che abbiano senso, a risposta multipla.
-            IMPORTANTE: Rispondi SOLO con array JSON VALIDO senza altre scritte solo l'array senza backtick,senza spazi bianchi e apici.
-            se il testo è povero di contenuto restituisci un []
-            ASSICURATI CHE IL JSON SIA CORRETTO E NON CI SIANO SPAZI BIANCHI
-            FORMATO: [{"question": "?", "options": ["A","B","C","D"], "correct": 0}]
-            TESTO: "${extractedText}"`;
+            const promptQuiz = `Genera quiz a risposta multipla basati su questo testo.
+            REGOLE CRITICHE:
+            1. Rispondi SOLO con un array JSON
+            2. NO testo prima o dopo l'array
+            3. NO markdown (no backtick)
+            4. NO spiegazioni
+            5. Array vuoto [] se testo insufficiente
+
+            FORMATO ESATTO:
+            [{"question":"Domanda?","options":["A","B","C","D"],"correct":0}]
+
+            VINCOLI:
+            - "correct" deve essere 0, 1, 2, o 3 (indice dell'opzione corretta)
+            - Tutte le stringhe tra virgolette doppie
+            - NO apici singoli
+            - NO spazi extra
+            - NO newline dentro le stringhe
+
+            TESTO DA ANALIZZARE: "${extractedText}"`;
 
             const responseQuiz = await genAI.models.generateContent({
                 model: "gemini-3-flash-preview",
