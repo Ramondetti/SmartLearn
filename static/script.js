@@ -1,9 +1,10 @@
 "use strict"
 
 let flashcardGlobal = []
-var currentIndex = 0;
-var isFlipped = false;
-var viewMode = "single";
+let quizGlobal = []
+let currentIndex = 0;
+let isFlipped = false;
+let viewMode = "single";
 
 // ============================================
 // Mobile Menu Toggle
@@ -254,10 +255,11 @@ async function handleFile(file) {
           console.log(flashcards)
           flashcardGlobal = flashcards
           const quiz = JSON.parse(data.quiz);
+          quizGlobal = quiz
 
           showDone();
           updateBar(100);
-          activateStep(5); // marca tutti gli step come ✓
+          activateStep(5);
 
           divElaborazioneCompletata.classList.remove("hidden");
           divElaborazioneCompletata.classList.add("inline-flex");
@@ -268,13 +270,11 @@ async function handleFile(file) {
           buttons.classList.remove("hidden");
           buttons.classList.add("flex");
           flashcardCount.textContent = flashcards.length;
-          quizCount.textContent = quiz.length;
+          quizCount.textContent = quiz.length
           loadingSection.classList.add("hidden")
           nomeDocumento.classList.remove("hidden")
           results.classList.remove("py-10")
           results.classList.add("py-16")
-          window.flashcardsData = flashcards
-          window.quizData = quiz
         } catch (parseErr) {
           alert("❌ Errore nel parsing dei risultati: " + parseErr.message);
         }
@@ -287,33 +287,13 @@ async function handleFile(file) {
 // BUTTONS
 // ============================================
 
-// ============================================
-// EVENT LISTENERS
-// ============================================
-
 scaricaQuizFlashcards.addEventListener("click", scaricaTutto);
 
 showFlashcard.addEventListener("click", function() {
-    // Nascondi results, mostra flashcard section
     sezioneResults.classList.add("hidden");
     flashcardsSection.classList.remove("hidden");
     
-    // Popola dati globali se non già fatto
-    if (flashcardGlobal.length === 0 && generatedData?.flashcards) {
-        flashcardGlobal = generatedData.flashcards;
-    }
-    
-    // Reset index
-    currentIndex = 0;
-    isFlipped = false;
-    
-    // Update header
-    flashcardCountFlashcardSection.textContent = flashcardGlobal.length + " Flashcard Generate";
-    totalNum.textContent = flashcardGlobal.length;
-    currentNum.textContent = "1";
-    
-    // Render prima card
-    renderCard();
+    caricaDatiFlashcard()
 });
 
 btnStudio.addEventListener("click", function() {
@@ -343,6 +323,174 @@ btnGrid.addEventListener("click", function() {
     // Render grid view
     renderGridView();
 });
+
+nextFlashcard.addEventListener("click", function() {
+    // Reset flip state
+    isFlipped = false;
+    
+    // Incrementa index (con loop)
+    currentIndex = (currentIndex + 1) % flashcardGlobal.length;
+    
+    // Re-render card
+    renderCard();
+    
+    // Update UI
+    currentNum.textContent = currentIndex + 1;
+});
+
+prevFlashcard.addEventListener("click", function() {
+    // Reset flip state
+    isFlipped = false;
+    
+    // Decrementa index (con loop)
+    currentIndex = (currentIndex - 1 + flashcardGlobal.length) % flashcardGlobal.length;
+    
+    // Re-render card
+    renderCard();
+    
+    // Update UI
+    currentNum.textContent = currentIndex + 1;
+});
+
+goToQuiz.addEventListener("click",function(){
+    flashcardsSection.classList.add("hidden")
+    quizSection.classList.remove("hidden")
+    caricaDatiQuiz()
+})
+
+showQuiz.addEventListener("click",function(){
+    sezioneResults.classList.add("hidden");
+    quizSection.classList.remove("hidden")
+    caricaDatiQuiz()
+})
+
+backToFlashcards.addEventListener("click",function(){
+    quizSection.classList.add("hidden")
+    flashcardsSection.classList.remove("hidden")
+})
+
+function caricaDatiFlashcard(){
+    // Reset index
+    currentIndex = 0;
+    isFlipped = false;
+    
+    // Update header
+    flashcardCountFlashcardSection.textContent = flashcardGlobal.length + " Flashcard Generate";
+    totalNum.textContent = flashcardGlobal.length;
+    currentNum.textContent = "1";
+    
+    // Render prima card
+    renderCard();
+}
+
+function caricaDatiQuiz() {
+    const quizData = quizGlobal;
+
+    let currentQuestion = 0;
+    let score = 0;
+    let answered = false;
+
+    const questionEl = document.getElementById("quizQuestion");
+    const answersEl = document.getElementById("quizAnswers");
+    const progressEl = document.getElementById("quizProgress");
+    const currentEl = document.getElementById("quizCurrent");
+    const totalEl = document.getElementById("quizTotal");
+    const feedbackEl = document.getElementById("quizFeedback");
+    const resultEl = document.getElementById("quizResult");
+    const scoreEl = document.getElementById("quizScore");
+
+    const prevBtn = document.getElementById("prevQuiz");
+    const nextBtn = document.getElementById("nextQuiz");
+    const retryBtn = document.getElementById("retryQuiz");
+
+    totalEl.textContent = "/ " + quizData.length;
+
+    function renderQuestion() {
+
+        const q = quizData[currentQuestion];
+
+        answered = false;
+        feedbackEl.classList.add("hidden");
+
+        questionEl.textContent = q.question;
+        currentEl.textContent = currentQuestion + 1;
+
+        const progress = ((currentQuestion + 1) / quizData.length) * 100;
+        progressEl.style.width = progress + "%";
+
+        answersEl.innerHTML = "";
+
+        q.options.forEach((answer, index) => {
+            const btn = document.createElement("button");
+            btn.className =
+                "quiz-option hover:cursor-pointer w-full rounded-xl border border-gray-200 bg-white px-6 py-4 text-left text-gray-700 font-medium transition hover:border-purple-500 hover:bg-purple-50";
+            btn.textContent = answer;
+            btn.onclick = () => {
+
+                if (answered) return;
+                answered = true;
+                const options = answersEl.querySelectorAll("button");
+                options.forEach((b, i) => {
+
+                    if (i === q.correct) {
+                        b.classList.add("bg-green-100", "border-green-500");
+                    }
+
+                    if (i === index && i !== q.correct) {
+                        b.classList.add("bg-red-100", "border-red-500");
+                    }
+                    b.disabled = true;
+                });
+
+                if (index === q.correct) {
+                    score++;
+                    feedbackEl.textContent = "Risposta corretta ✅";
+                    feedbackEl.className =
+                        "mt-6 rounded-xl p-4 text-sm font-medium bg-green-100 text-green-700";
+                } else {
+                    feedbackEl.textContent = "Risposta sbagliata ❌";
+                    feedbackEl.className =
+                        "mt-6 rounded-xl p-4 text-sm font-medium bg-red-100 text-red-700";
+                }
+                feedbackEl.classList.remove("hidden");
+            };
+            answersEl.appendChild(btn);
+        });
+    }
+
+    nextBtn.onclick = () => {
+        if (currentQuestion < quizData.length - 1) {
+            currentQuestion++;
+            renderQuestion();
+        } else {
+            showResult();
+        }
+    };
+
+    prevBtn.onclick = () => {
+        if (currentQuestion > 0) {
+            currentQuestion--;
+            renderQuestion();
+        }
+    };
+
+    function showResult() {
+
+        document.querySelector(".bg-white.rounded-2xl.shadow-lg.border").classList.add("hidden");
+        resultEl.classList.remove("hidden");
+        scoreEl.textContent = score + " / " + quizData.length;
+    }
+
+    retryBtn.onclick = () => {
+
+        currentQuestion = 0;
+        score = 0;
+        resultEl.classList.add("hidden");
+        document.querySelector(".bg-white.rounded-2xl.shadow-lg.border").classList.remove("hidden");
+        renderQuestion();
+    };
+    renderQuestion();
+}
 
 // ============================================
 // RENDER CARD (crea HTML)
@@ -416,62 +564,6 @@ function flipCard() {
         cardContainer.style.transform = "rotateY(180deg)";
     } else {
         cardContainer.style.transform = "rotateY(0deg)";
-    }
-}
-
-// ============================================
-// NEXT FLASHCARD (carta successiva)
-// ============================================
-
-nextFlashcard.addEventListener("click", function() {
-    // Reset flip state
-    isFlipped = false;
-    
-    // Incrementa index (con loop)
-    currentIndex = (currentIndex + 1) % flashcardGlobal.length;
-    
-    // Re-render card
-    renderCard();
-    
-    // Update UI
-    currentNum.textContent = currentIndex + 1;
-});
-
-// ============================================
-// PREVIOUS FLASHCARD (carta precedente)
-// ============================================
-
-prevFlashcard.addEventListener("click", function() {
-    // Reset flip state
-    isFlipped = false;
-    
-    // Decrementa index (con loop)
-    currentIndex = (currentIndex - 1 + flashcardGlobal.length) % flashcardGlobal.length;
-    
-    // Re-render card
-    renderCard();
-    
-    // Update UI
-    currentNum.textContent = currentIndex + 1;
-});
-
-// ============================================
-// PROGRESS DOTS CON FINESTRA SCORREVOLE
-// ============================================
-
-function createDot(index, isActive) {
-    const dot = document.createElement('div');
-    
-    if (isActive) {
-        dot.className = "h-2 w-6 rounded-full bg-indigo-600 transition-all flex-shrink-0";
-    } else {
-        dot.className = "h-2 w-2 rounded-full bg-gray-300 hover:bg-gray-400 transition-all cursor-pointer flex-shrink-0";
-        dot.addEventListener('click', () => {
-            isFlipped = false;
-            currentIndex = index;
-            renderCard();
-            currentNum.textContent = currentIndex + 1;
-        });
     }
 }
 
@@ -653,8 +745,8 @@ function scaricaTutto() {
     console.log('📄 Generando PDF...');
     
     // ✅ PARSE se sono stringhe
-    let flashcards = window.flashcardsData;
-    let quiz = window.quizData;
+    let flashcards = flashcardGlobal;
+    let quiz = quizGlobal
     
     // Se sono stringhe, parse
     if (typeof flashcards === 'string') {
