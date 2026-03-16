@@ -369,6 +369,37 @@ backToFlashcards.addEventListener("click",function(){
     flashcardsSection.classList.remove("hidden")
 })
 
+showAiTutor.addEventListener("click",function(){
+    sezioneResults.classList.add("hidden")
+    aiTutorSection.classList.remove("hidden")
+})
+
+goToAI.addEventListener("click",function(){
+    flashcardsSection.classList.add("hidden")
+    aiTutorSection.classList.remove("hidden")
+})
+
+goToAIFromQuiz.addEventListener("click",function(){
+    quizSection.classList.add("hidden")
+    aiTutorSection.classList.remove("hidden")
+})
+
+backToResultsFromAI.addEventListener("click",function(){
+    aiTutorSection.classList.add("hidden")
+    sezioneResults.classList.remove("hidden")
+})
+
+sendBtn.addEventListener("click",async function(){
+    const response = await inviaRichiesta("POST","/chat",{"prompt":chatInput.textContent})
+
+    if(response.status == 200){
+        console.log(response.data)
+    }
+    else{
+        alert(response.status + " : " + response.err)
+    }
+})
+
 function caricaDatiFlashcard(){
     // Reset index
     currentIndex = 0;

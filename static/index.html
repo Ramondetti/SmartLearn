@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="SmartLearn - Trasforma i tuoi appunti in flashcard e quiz con l'intelligenza artificiale">
-  <meta name="author" content="Il Tuo Nome">
+  <meta name="author" content="Edoardo Ramondetti">
   <title>SmartLearn - Il Tuo Assistente Intelligente per lo Studio</title>
 
   <link href="./src/output.css" rel="stylesheet">
@@ -16,7 +16,7 @@
 
 <body class="bg-linear-to-br from-slate-50 to-blue-50 min-h-screen">
   <!-- SEZIONE Home page -->
-  <div id="homepage">
+  <section id="homepage">
   <!-- ============================================ -->
   <!-- NAVBAR -->
   <!-- ============================================ -->
@@ -642,9 +642,9 @@
       </div>
     </div>
   </footer>
-  </div>
+  </section>
   <!-- SEZIONE RISULTATI (nascosta di default) -->
-   <div id="sezioneResults" class="hidden">
+   <section id="sezioneResults" class="hidden">
     <!-- ============================================ -->
     <!-- RESULTS: Panoramica Risultati -->
     <!-- ============================================ -->
@@ -832,7 +832,7 @@
                         <p class="text-gray-600 mb-4">
                             Risposte illimitate
                         </p>
-                        <button class="hover:cursor-pointer w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition group-hover:scale-105 transform">
+                        <button id="showAiTutor" class="hover:cursor-pointer w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition group-hover:scale-105 transform">
                             Apri Tutor →
                         </button>
                     </div>
@@ -849,8 +849,8 @@
             </div>
         </div>
     </section>
-</div>
-<section id="flashcardsSection" class="hidden py-16 px-4 sm:px-6 lg:px-8 bg-linear-to-br from-indigo-50 via-white to-purple-50">
+  </section>
+  <section id="flashcardsSection" class="anim-fade hidden py-16 px-4 sm:px-6 lg:px-8 bg-linear-to-br from-indigo-50 via-white to-purple-50">
   <div class="mx-auto max-w-5xl">
     
     <!-- Header -->
@@ -933,8 +933,8 @@
   </button>
 </div>
   </div>
-</section>
-<section id="quizSection" class="hidden py-16 px-4 sm:px-6 lg:px-8 bg-linear-to-br from-purple-50 via-white to-indigo-50">
+  </section>
+  <section id="quizSection" class="anim-fade hidden py-16 px-4 sm:px-6 lg:px-8 bg-linear-to-br from-purple-50 via-white to-indigo-50">
   <div class="mx-auto max-w-4xl">
 
     <!-- Header -->
@@ -1061,6 +1061,243 @@
       </div>
     </div>
   </div>
-</section>
+  </section>
+  <section id="aiTutorSection" class="anim-fade hidden min-h-screen bg-linear-to-br from-gray-50 to-blue-50">
+      <div class="h-screen flex flex-col max-w-5xl mx-auto">
+          
+          <!-- Header -->
+          <div class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shadow-sm">
+              <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 rounded-full bg-linear-to-br from-blue-500 to-cyan-600 flex items-center justify-center">
+                      <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                      </svg>
+                  </div>
+                  <div>
+                      <h2 class="text-xl font-bold text-gray-900">AI Tutor</h2>
+                      <p class="text-sm text-gray-500">Assistente personale per lo studio</p>
+                  </div>
+              </div>
+              
+              <div class="flex items-center gap-3">
+                  <!-- Info Button -->
+                  <button id="aiTutorInfoBtn" class="p-2 hover:bg-gray-100 rounded-lg transition" title="Informazioni">
+                      <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                      </svg>
+                  </button>
+                  
+                  <!-- Clear Chat Button -->
+                  <button id="clearChatBtn" class="p-2 hover:bg-gray-100 rounded-lg transition" title="Cancella chat">
+                      <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                      </svg>
+                  </button>
+                  
+                  <!-- Back Button -->
+                  <button id="backToResultsFromAI" class="px-4 py-2 text-gray-700 rounded-lg transition flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                    </svg>
+                      <span>Indietro</span>
+                  </button>
+              </div>
+          </div>
+
+          <!-- Suggested Questions (shown when chat is empty) -->
+          <div id="suggestedQuestions" class="flex-1 flex flex-col items-center justify-center p-8">
+              <div class="max-w-3xl w-full">
+                  <div class="text-center mb-8">
+                      <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-linear-to-br from-blue-500 to-cyan-600 flex items-center justify-center">
+                          <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
+                          </svg>
+                      </div>
+                      <h3 class="text-2xl font-bold text-gray-900 mb-2">Come posso aiutarti?</h3>
+                      <p class="text-gray-600">Fai una domanda sul materiale di studio o scegli una delle domande suggerite</p>
+                  </div>
+
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <!-- Suggested Question 1 -->
+                      <button class="hover:cursor-pointer suggested-question-btn text-left p-4 bg-white rounded-xl border-2 border-gray-200 hover:border-blue-500 transition-all shadow-sm hover:shadow-md group">
+                          <div class="flex items-start gap-3">
+                              <div class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0 group-hover:bg-blue-500 transition-colors">
+                                  <svg class="w-5 h-5 text-blue-600 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                  </svg>
+                              </div>
+                              <div class="flex-1">
+                                  <p class="font-medium text-gray-900 mb-1">Riassumi il documento</p>
+                                  <p class="text-sm text-gray-500">Ottieni un riassunto conciso del materiale</p>
+                              </div>
+                          </div>
+                      </button>
+
+                      <!-- Suggested Question 2 -->
+                      <button class="hover:cursor-pointer suggested-question-btn text-left p-4 bg-white rounded-xl border-2 border-gray-200 hover:border-purple-500 transition-all shadow-sm hover:shadow-md group">
+                          <div class="flex items-start gap-3">
+                              <div class="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center shrink-0 group-hover:bg-purple-500 transition-colors">
+                                  <svg class="w-5 h-5 text-purple-600 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                                  </svg>
+                              </div>
+                              <div class="flex-1">
+                                  <p class="font-medium text-gray-900 mb-1">Spiega i concetti chiave</p>
+                                  <p class="text-sm text-gray-500">Approfondisci gli argomenti principali</p>
+                              </div>
+                          </div>
+                      </button>
+
+                      <!-- Suggested Question 3 -->
+                      <button class="suggested-question-btn text-left p-4 bg-white rounded-xl border-2 border-gray-200 transition-all shadow-sm hover:shadow-md group"
+                      style="cursor: pointer;"
+                      onmouseover="this.style.borderColor='#22c55e'"
+                      onmouseout="this.style.borderColor='#e5e7eb'">
+                      <div class="flex items-start gap-3">
+                      <div class="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center shrink-0 group-hover:bg-green-500 transition-colors">
+                      <svg class="w-5 h-5 text-green-600 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                      </svg>
+                      </div>
+                      <div class="flex-1">
+                      <p class="font-medium text-gray-900 mb-1">Fammi delle domande</p>
+                      <p class="text-sm text-gray-500">Testa la tua comprensione</p>
+                      </div>
+                      </div>
+                      </button>
+
+                      <!-- Suggested Question 4 -->
+                      <button class="suggested-question-btn text-left p-4 bg-white rounded-xl border-2 border-gray-200 transition-all shadow-sm hover:shadow-md group"
+                      style="cursor: pointer;"
+                      onmouseover="this.style.borderColor='#f97316'"
+                      onmouseout="this.style.borderColor='#e5e7eb'">
+                      <div class="flex items-start gap-3">
+                      <div class="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center shrink-0 group-hover:bg-orange-500 transition-colors">
+                      <svg class="w-5 h-5 text-orange-600 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                      </svg>
+                      </div>
+                      <div class="flex-1">
+                      <p class="font-medium text-gray-900 mb-1">Crea esempi pratici</p>
+                      <p class="text-sm text-gray-500">Applica i concetti a casi reali</p>
+                      </div>
+                      </div>
+                      </button>
+                  </div>
+              </div>
+          </div>
+
+          <!-- Chat Messages Container -->
+          <div id="chatMessages" class="hidden flex-1 overflow-y-auto px-6 py-6 space-y-4">
+              <!-- Messages will be inserted here dynamically -->
+          </div>
+
+          <!-- Typing Indicator -->
+          <div id="typingIndicator" class="hidden px-6 py-2">
+              <div class="flex items-start gap-3 max-w-3xl">
+                  <div class="w-8 h-8 rounded-full bg-linear-to-br from-blue-500 to-cyan-600 flex items-center justify-center shrink-0">
+                      <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                      </svg>
+                  </div>
+                  <div class="bg-white rounded-2xl rounded-tl-none px-4 py-3 shadow-sm border border-gray-200">
+                      <div class="flex items-center gap-1">
+                          <div class="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style="animation-delay: 0s;"></div>
+                          <div class="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style="animation-delay: 0.2s;"></div>
+                          <div class="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style="animation-delay: 0.4s;"></div>
+                      </div>
+                  </div>
+              </div>
+          </div>
+
+          <!-- Input Area -->
+          <div class="bg-white border-t border-gray-200 px-6 py-4">
+              <div class="max-w-4xl mx-auto">
+                  <form id="chatForm" class="flex items-end gap-3">
+                      <!-- Textarea -->
+                      <div class="flex-1 relative">
+                          <textarea 
+                              id="chatInput" 
+                              rows="1"
+                              placeholder="Scrivi la tua domanda..."
+                              class="w-full px-4 py-3 pr-12 border-2 border-gray-300 rounded-xl resize-none focus:border-blue-500 focus:outline-none transition-colors max-h-32 overflow-y-auto"
+                              style="min-height: 48px;"
+                          ></textarea>
+                          
+                          <!-- Character count (optional) -->
+                          <div class="absolute bottom-2 right-3 text-xs text-gray-400">
+                              <span id="charCount">0</span>/2000
+                          </div>
+                      </div>
+
+                      <!-- Send Button -->
+                      <button 
+                          type="submit" 
+                          id="sendBtn"
+                          class="hover:cursor-pointer px-6 py-3 bg-linear-to-r from-blue-600 to-cyan-600 text-white rounded-xl font-semibold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                          <span>Invia</span>
+                          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                          </svg>
+                      </button>
+                  </form>
+
+                  <!-- Info text -->
+                  <p class="text-xs text-gray-500 text-center mt-3">
+                      💡 L'AI può commettere errori. Verifica sempre le informazioni importanti.
+                  </p>
+              </div>
+          </div>
+      </div>
+  </section>
+  <!-- ============================================ -->
+  <!-- Info Modal (opzionale) -->
+  <!-- ============================================ -->
+  <div id="aiTutorInfoModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+          <div class="bg-linear-to-r from-blue-500 to-cyan-600 px-6 py-4 rounded-t-2xl">
+              <h3 class="text-white font-bold text-lg">ℹ️ Come usare l'AI Tutor</h3>
+          </div>
+          
+          <div class="p-6 space-y-4">
+              <div class="flex items-start gap-3">
+                  <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                      <span class="text-blue-600 font-bold">1</span>
+                  </div>
+                  <div>
+                      <p class="font-medium text-gray-900">Fai domande specifiche</p>
+                      <p class="text-sm text-gray-600">Più la domanda è precisa, migliore sarà la risposta</p>
+                  </div>
+              </div>
+
+              <div class="flex items-start gap-3">
+                  <div class="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center shrink-0">
+                      <span class="text-purple-600 font-bold">2</span>
+                  </div>
+                  <div>
+                      <p class="font-medium text-gray-900">Chiedi approfondimenti</p>
+                      <p class="text-sm text-gray-600">Puoi chiedere di spiegare meglio un concetto</p>
+                  </div>
+              </div>
+
+              <div class="flex items-start gap-3">
+                  <div class="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                      <span class="text-green-600 font-bold">3</span>
+                  </div>
+                  <div>
+                      <p class="font-medium text-gray-900">Verifica le informazioni</p>
+                      <p class="text-sm text-gray-600">L'AI può sbagliare, confronta sempre con le fonti</p>
+                  </div>
+              </div>
+          </div>
+
+          <div class="px-6 pb-6">
+              <button onclick="document.getElementById('aiTutorInfoModal').classList.add('hidden')" 
+                      class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                  Ho capito
+              </button>
+          </div>
+      </div>
+  </div>
 </body>
 </html>

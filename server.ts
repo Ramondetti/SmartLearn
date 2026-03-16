@@ -125,6 +125,57 @@ const corsOptions = {
 app.use("/", cors(corsOptions));
 
 //E. gestione delle risorse dinamiche
+//USARE FORSE OLLAMA, RISOLVERE PROBLEMA
+// ============================================
+// HELPER: Parse JSON robusto
+// ============================================
+
+function extractJSON(text: string): any[] {
+    console.log('🔍 Extracting JSON from AI response...');
+    
+    // Rimuovi markdown
+    text = text.replace(/```json/gi, '').replace(/```/g, '');
+    
+    // Trova primo [ e ultimo ]
+    const start = text.indexOf('[');
+    const end = text.lastIndexOf(']');
+    
+    if (start === -1 || end === -1 || start > end) {
+        console.warn('⚠️ No valid JSON array found');
+        return [];
+    }
+    
+    const jsonStr = text.substring(start, end + 1)
+        .replace(/\n/g, ' ')
+        .replace(/\r/g, '')
+        .replace(/\t/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    
+    try {
+        const parsed = JSON.parse(jsonStr);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (error: any) {
+        console.error('❌ JSON parse error:', error.message);
+        
+        // Tentativo riparazione
+        try {
+            const repaired = jsonStr
+                .replace(/'/g, '"')
+                .replace(/,\s*([}\]])/g, '$1');
+            
+            const parsed = JSON.parse(repaired);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch {
+            return [];
+        }
+    }
+}
+
+// ============================================
+// UPLOAD ENDPOINT - VERSIONE ROBUSTA E VELOCE
+// ============================================
+
 app.post("/api/upload", upload.single("file"), async function(req, res) {
     // ── Setup SSE ──
     res.setHeader("Content-Type", "text/event-stream");
@@ -132,7 +183,6 @@ app.post("/api/upload", upload.single("file"), async function(req, res) {
     res.setHeader("Connection", "keep-alive");
     res.flushHeaders();
 
-    // Helper per mandare eventi al client
     const sendEvent = (step: number, pct: number, msg: string) => {
         res.write(`data: ${JSON.stringify({ step, pct, msg })}\n\n`);
     };
@@ -161,95 +211,139 @@ app.post("/api/upload", upload.single("file"), async function(req, res) {
             const content = await page.getTextContent();
             extractedTextFromPdf += content.items.map((item: any) => item.str).join(" ") + "\n";
 
-            // Aggiorna il progresso pagina per pagina
             const pct = 20 + Math.round((i / pdf.numPages) * 15);
             sendEvent(1, pct, `Analisi pagina ${i} di ${pdf.numPages}...`);
         }
         extractedTextFromPdf = extractedTextFromPdf.replace(/\s+/g, " ").trim();
         sendEvent(1, 35, "Testo estratto con successo ✓");
 
-        // ── Step 3: Generazione Flashcard ──
+        console.log('📄 Extracted text length:', extractedTextFromPdf.length);
+
+        // ── Step 3 & 4: Generazione PARALLELA (più veloce!) ──
         const MAX_CHARS = 70000;
-        const chunksCount = Math.ceil(extractedTextFromPdf.length / MAX_CHARS);
-        let rispostaFlashcard = "";
-
+        const chunks: string[] = [];
+        
         for (let i = 0; i < extractedTextFromPdf.length; i += MAX_CHARS) {
-            const chunkIndex = Math.floor(i / MAX_CHARS) + 1;
-            const pct = 35 + Math.round((chunkIndex / chunksCount) * 30);
-            sendEvent(2, pct, `Generazione flashcard (parte ${chunkIndex}/${chunksCount})...`);
-
-            const extractedText = extractedTextFromPdf.substring(i, i + MAX_CHARS);
-            const promptFlashcard = `Genera quante più flashcard che abbiano senso di livello avanzato dal testo seguente.
-            Rispondi SOLO con un array JSON VALIDO senza altre scritte solo l'array senza backtick e apici.
-            se il testo è povero di contenuto restituisci un []
-            Formato: [{ "front": "...", "back": "..." }]
-            TESTO: "${extractedText}"`;
-
-            const responseFlashCard = await genAI.models.generateContent({
-                model: "gemini-3-flash-preview",
-                contents: promptFlashcard
-            });
-            rispostaFlashcard += responseFlashCard.text;
+            chunks.push(extractedTextFromPdf.substring(i, i + MAX_CHARS));
         }
-        sendEvent(2, 65, "Flashcard generate con successo ✓");
-        console.log("FLASHCARD GENERATE")
 
-        // ── Step 4: Generazione Quiz ──
-        let rispostaQuiz = "";
+        console.log('📚 Processing', chunks.length, 'chunks in parallel...');
+        
+        sendEvent(2, 40, "Generazione flashcard e quiz...");
 
-        for (let i = 0; i < extractedTextFromPdf.length; i += MAX_CHARS) {
-            const chunkIndex = Math.floor(i / MAX_CHARS) + 1;
-            const pct = 65 + Math.round((chunkIndex / chunksCount) * 30);
-            sendEvent(3, pct, `Generazione quiz (parte ${chunkIndex}/${chunksCount})...`);
+        // ✅ GENERA FLASHCARD E QUIZ IN PARALLELO
+        const flashcardPromises = chunks.map(async (chunk, index) => {
+            const promptFlashcard = `Genera flashcard di livello avanzato dal testo seguente.
+            Rispondi SOLO con un array JSON senza altre scritte, senza backtick, senza markdown.
+            Se il testo è povero restituisci []
+            Formato: [{"front":"Domanda?","back":"Risposta"}]
+            TESTO: "${chunk}"`;
 
-            const extractedText = extractedTextFromPdf.substring(i, i + MAX_CHARS);
-            const promptQuiz = `Genera quiz a risposta multipla basati su questo testo.
-            REGOLE CRITICHE:
-            1. Rispondi SOLO con un array JSON
-            2. NO testo prima o dopo l'array
-            3. NO markdown (no backtick)
-            4. NO spiegazioni
-            5. Array vuoto [] se testo insufficiente
+            try {
+                const response = await genAI.models.generateContent({
+                    model: "gemini-2.5-flash",
+                    contents: promptFlashcard
+                });
 
-            FORMATO ESATTO:
-            [{"question":"Domanda?","options":["A","B","C","D"],"correct":0}]
+                const flashcards = extractJSON(response.text!);
+                
+                // Filtra flashcard valide
+                const valid = flashcards.filter(f =>
+                    f?.front && f?.back &&
+                    typeof f.front === 'string' &&
+                    typeof f.back === 'string' &&
+                    f.front.trim() && f.back.trim()
+                );
 
+                console.log(`✅ Flashcard chunk ${index + 1}: ${valid.length} valid`);
+                return valid;
+
+            } catch (error: any) {
+                console.error(`❌ Flashcard chunk ${index + 1} failed:`, error.message);
+                return [];
+            }
+        });
+
+        const quizPromises = chunks.map(async (chunk, index) => {
+            const promptQuiz = `Genera quiz a risposta multipla dal testo seguente.
+            Rispondi SOLO con un array JSON senza altre scritte, senza backtick, senza markdown.
+            Se il testo è povero restituisci []
+            Formato: [{"question":"Domanda?","options":["A","B","C","D"],"correct":0}]
             VINCOLI:
-            - "correct" deve essere 0, 1, 2, o 3 (indice dell'opzione corretta)
-            - Tutte le stringhe tra virgolette doppie
-            - NO apici singoli
-            - NO spazi extra
-            - NO newline dentro le stringhe
+            - correct deve essere 0, 1, 2 o 3
+            - Esattamente 4 opzioni
+            TESTO: "${chunk}"`;
 
-            TESTO DA ANALIZZARE: "${extractedText}"`;
+            try {
+                const response = await genAI.models.generateContent({
+                    model: "gemini-2.5-flash",
+                    contents: promptQuiz
+                });
 
-            const responseQuiz = await genAI.models.generateContent({
-                model: "gemini-3-flash-preview",
-                contents: promptQuiz
-            });
-            rispostaQuiz += responseQuiz.text;
-        }
-        sendEvent(3, 95, "Quiz generati con successo ✓");
-        console.log("QUIZ GENERATI")
+                const quizzes = extractJSON(response.text!);
+                
+                // Filtra quiz validi
+                const valid = quizzes.filter(q =>
+                    q?.question &&
+                    Array.isArray(q.options) &&
+                    q.options.length === 4 &&
+                    typeof q.correct === 'number' &&
+                    q.correct >= 0 &&
+                    q.correct <= 3 &&
+                    q.options.every((opt: any) => typeof opt === 'string' && opt.trim())
+                );
 
-        // ── Step finale: manda i dati ──
+                console.log(`✅ Quiz chunk ${index + 1}: ${valid.length} valid`);
+                return valid;
+
+            } catch (error: any) {
+                console.error(`❌ Quiz chunk ${index + 1} failed:`, error.message);
+                return [];
+            }
+        });
+
+        // ✅ ATTENDI TUTTO IN PARALLELO
+        sendEvent(2, 50, "Elaborazione in corso...");
+        
+        const [flashcardResults, quizResults] = await Promise.all([
+            Promise.all(flashcardPromises),
+            Promise.all(quizPromises)
+        ]);
+
+        // Flatten arrays
+        const allFlashcards = flashcardResults.flat();
+        const allQuizzes = quizResults.flat();
+
+        sendEvent(2, 90, `Flashcard: ${allFlashcards.length} ✓`);
+        sendEvent(3, 95, `Quiz: ${allQuizzes.length} ✓`);
+
+        console.log('✅ Total flashcards:', allFlashcards.length);
+        console.log('✅ Total quizzes:', allQuizzes.length);
+
+        // ── Step finale ──
         sendEvent(4, 100, "Tutto pronto! 🚀");
+        
         res.write(`data: ${JSON.stringify({
             done: true,
-            flashcard: rispostaFlashcard,
-            quiz: rispostaQuiz
+            flashcard: JSON.stringify(allFlashcards),
+            quiz: JSON.stringify(allQuizzes),
+            extractedText: extractedTextFromPdf
         })}\n\n`);
+        
         res.end();
 
-        // Pulisci il file uploadato
         fs.unlinkSync(filePath);
 
+        console.log('✅ Upload completed successfully');
+
     } catch (error: any) {
-        console.error("Errore server:", error);
+        console.error("❌ Errore server:", error);
         res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
         res.end();
     }
 });
+
+
 
 app.get("/api/:collection",async function(req:any,res,next) {
     const selectedCollection = req.params.collection
