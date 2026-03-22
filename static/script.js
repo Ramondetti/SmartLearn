@@ -1,10 +1,22 @@
 "use strict"
 
+let documentoCorrente
+let testoEstratto
 let flashcardGlobal = []
 let quizGlobal = []
 let currentIndex = 0;
 let isFlipped = false;
 let viewMode = "single";
+
+// ============================================
+// AI TUTOR - VARIABILI GLOBALI
+// ============================================
+let chatHistory = [];
+const suggestedQuestions = document.getElementById('suggestedQuestions');
+const chatMessages = document.getElementById('chatMessages');
+const typingIndicator = document.getElementById('typingIndicator');
+const clearChatBtn = document.getElementById('clearChatBtn');
+const aiTutorInfoBtn = document.getElementById('aiTutorInfoBtn');
 
 // ============================================
 // Mobile Menu Toggle
@@ -76,6 +88,15 @@ fileInput.addEventListener('change', (e) => {
     handleFile(file);
     homepage.classList.add("hidden");
     sezioneResults.classList.remove("hidden");
+    loadingSection.classList.remove("hidden")
+    divElaborazioneCompletata.classList.remove("inline-flex");
+    divElaborazioneCompletata.classList.add("hidden");
+    divCreazione.classList.add("hidden");
+    divFlashcard.classList.add("hidden");
+    divQuiz.classList.add("hidden");
+    divTutorAi.classList.add("hidden");
+    buttons.classList.add("hidden");
+    nomeDocumento.classList.add("hidden")
   }
 });
 
@@ -116,7 +137,7 @@ function setStatus(msg) {
   const statusEl = document.getElementById('statusMsg');
   if (!statusEl) return;
   statusEl.style.animation = 'none';
-  statusEl.offsetHeight; // force reflow
+  statusEl.offsetHeight;
   statusEl.style.animation = 'status-change .35s ease both';
   statusEl.textContent = msg;
 }
@@ -127,7 +148,7 @@ function updateBar(pct) {
 
   if (pctEl)   pctEl.textContent = pct + '%';
   if (barFill) {
-    barFill.style.animation  = 'bar-sheen 1.8s linear infinite'; // mantieni solo lo sheen
+    barFill.style.animation  = 'bar-sheen 1.8s linear infinite';
     barFill.style.width      = pct + '%';
     barFill.style.transition = 'width 0.6s cubic-bezier(.4,0,.2,1)';
   }
@@ -140,17 +161,14 @@ function activateStep(stepNumber) {
     if (!el || !ic) continue;
 
     if (i < stepNumber) {
-      // completato
       el.className = `step-done ${STEP_BASE}`;
       ic.className = `icon-done ${ICON_BASE}`;
       ic.textContent = '✓';
     } else if (i === stepNumber) {
-      // attivo
       el.className = `step-active ${STEP_BASE}`;
       ic.className = `icon-active icon-active-pulse ${ICON_BASE}`;
       ic.textContent = '●';
     } else {
-      // in attesa
       el.className = `step-idle ${STEP_BASE}`;
       ic.className = `icon-idle ${ICON_BASE}`;
       ic.textContent = String(i);
@@ -173,13 +191,11 @@ function showDone() {
 // FILE HANDLING — con SSE reale
 // ============================================
 async function handleFile(file) {
-  // Validazione tipo
   const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
   if (!allowedTypes.includes(file.type)) {
     alert('❌ Tipo file non supportato. Usa PDF, JPG o PNG');
     return;
   }
-  // Validazione dimensione
   if (file.size > 10 * 1024 * 1024) {
     alert('❌ File troppo grande. Massimo 10MB');
     return;
@@ -187,13 +203,13 @@ async function handleFile(file) {
 
   documentTitle.textContent = file.name;
 
-  // Stato iniziale UI
   updateBar(0);
   activateStep(1);
   setStatus('Avvio elaborazione...');
 
   const formData = new FormData();
   formData.append('file', file);
+  documentoCorrente = formData
 
   let response;
   try {
@@ -211,7 +227,6 @@ async function handleFile(file) {
     return;
   }
 
-  // Leggi lo stream SSE
   const reader  = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer    = "";
@@ -220,12 +235,10 @@ async function handleFile(file) {
     const { done, value } = await reader.read();
     if (done) break;
 
-    // Accumula nel buffer — i chunk possono arrivare spezzati
     buffer += decoder.decode(value, { stream: true });
 
-    // Processa solo le righe complete (separate da \n)
     const lines = buffer.split("\n");
-    buffer = lines.pop(); // l'ultima potrebbe essere incompleta
+    buffer = lines.pop();
 
     for (const line of lines) {
       if (!line.startsWith("data: ")) continue;
@@ -234,21 +247,18 @@ async function handleFile(file) {
       try {
         data = JSON.parse(line.slice(6));
       } catch {
-        continue; // riga malformata, salta
+        continue;
       }
 
-      // Errore dal server
       if (data.error) {
         alert("❌ " + data.error);
         return;
       }
 
-      // Aggiorna UI con dati reali
       if (data.pct  !== undefined) updateBar(data.pct);
       if (data.msg  !== undefined) setStatus(data.msg);
       if (data.step !== undefined) activateStep(data.step);
 
-      // Elaborazione completata
       if (data.done) {
         try {
           const flashcards = JSON.parse(data.flashcard);
@@ -256,6 +266,7 @@ async function handleFile(file) {
           flashcardGlobal = flashcards
           const quiz = JSON.parse(data.quiz);
           quizGlobal = quiz
+          testoEstratto = data.extractedText
 
           showDone();
           updateBar(100);
@@ -283,6 +294,7 @@ async function handleFile(file) {
     }
   }
 }
+
 // ============================================
 // BUTTONS
 // ============================================
@@ -300,7 +312,6 @@ btnStudio.addEventListener("click", function() {
     singleView.classList.remove("hidden");
     gridView.classList.add("hidden");
     
-    // Update button styles
     btnStudio.classList.add("bg-indigo-600", "text-white");
     btnStudio.classList.remove("bg-white", "border-2", "border-gray-300", "text-gray-700");
     
@@ -313,42 +324,26 @@ btnGrid.addEventListener("click", function() {
     gridView.classList.remove("hidden");
     gridView.classList.add("grid")
     
-    // Update button styles
     btnGrid.classList.add("bg-indigo-600", "text-white");
     btnGrid.classList.remove("bg-white", "border-2", "border-gray-300", "text-gray-700");
     
     btnStudio.classList.remove("bg-indigo-600", "text-white");
     btnStudio.classList.add("bg-white", "border-2", "border-gray-300", "text-gray-700");
     
-    // Render grid view
     renderGridView();
 });
 
 nextFlashcard.addEventListener("click", function() {
-    // Reset flip state
     isFlipped = false;
-    
-    // Incrementa index (con loop)
     currentIndex = (currentIndex + 1) % flashcardGlobal.length;
-    
-    // Re-render card
     renderCard();
-    
-    // Update UI
     currentNum.textContent = currentIndex + 1;
 });
 
 prevFlashcard.addEventListener("click", function() {
-    // Reset flip state
     isFlipped = false;
-    
-    // Decrementa index (con loop)
     currentIndex = (currentIndex - 1 + flashcardGlobal.length) % flashcardGlobal.length;
-    
-    // Re-render card
     renderCard();
-    
-    // Update UI
     currentNum.textContent = currentIndex + 1;
 });
 
@@ -369,48 +364,278 @@ backToFlashcards.addEventListener("click",function(){
     flashcardsSection.classList.remove("hidden")
 })
 
-showAiTutor.addEventListener("click",function(){
-    sezioneResults.classList.add("hidden")
-    aiTutorSection.classList.remove("hidden")
-})
+// ============================================
+// AI TUTOR - NAVIGATION
+// ============================================
 
-goToAI.addEventListener("click",function(){
-    flashcardsSection.classList.add("hidden")
-    aiTutorSection.classList.remove("hidden")
-})
-
-goToAIFromQuiz.addEventListener("click",function(){
-    quizSection.classList.add("hidden")
-    aiTutorSection.classList.remove("hidden")
-})
-
-backToResultsFromAI.addEventListener("click",function(){
-    aiTutorSection.classList.add("hidden")
-    sezioneResults.classList.remove("hidden")
-})
-
-sendBtn.addEventListener("click",async function(){
-    const response = await inviaRichiesta("POST","/chat",{"prompt":chatInput.textContent})
-
-    if(response.status == 200){
-        console.log(response.data)
+showAiTutor.addEventListener("click", function() {
+    sezioneResults.classList.add("hidden");
+    aiTutorSection.classList.remove("hidden");
+    
+    if (chatHistory.length === 0) {
+        showSuggestedQuestions();
     }
-    else{
-        alert(response.status + " : " + response.err)
+});
+
+goToAI.addEventListener("click", function() {
+    flashcardsSection.classList.add("hidden");
+    aiTutorSection.classList.remove("hidden");
+    
+    if (chatHistory.length === 0) {
+        showSuggestedQuestions();
     }
-})
+});
+
+goToAIFromQuiz.addEventListener("click", function() {
+    quizSection.classList.add("hidden");
+    aiTutorSection.classList.remove("hidden");
+    
+    if (chatHistory.length === 0) {
+        showSuggestedQuestions();
+    }
+});
+
+backToResultsFromAI.addEventListener("click", function() {
+    aiTutorSection.classList.add("hidden");
+    sezioneResults.classList.remove("hidden");
+});
+
+// ============================================
+// AI TUTOR - SUGGESTED QUESTIONS
+// ============================================
+
+function showSuggestedQuestions() {
+    suggestedQuestions.classList.remove('hidden');
+    chatMessages.classList.add('hidden');
+}
+
+function hideSuggestedQuestions() {
+    suggestedQuestions.classList.add('hidden');
+    chatMessages.classList.remove('hidden');
+}
+
+document.querySelectorAll('.suggested-question-btn').forEach((btn, index) => {
+    btn.addEventListener('click', function() {
+        const questions = [
+            "Riassumi il documento in modo conciso",
+            "Spiega i concetti chiave del documento",
+            "Fammi 3 domande per testare la mia comprensione",
+            "Crea esempi pratici basati sul documento"
+        ];
+        sendMessage(questions[index]);
+    });
+});
+
+// ============================================
+// AI TUTOR - CHAT FORM
+// ============================================
+
+const chatForm = document.getElementById('chatForm');
+const chatInput = document.getElementById('chatInput');
+const sendBtn = document.getElementById('sendBtn');
+const charCount = document.getElementById('charCount');
+
+chatForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const message = chatInput.value.trim();
+    if (!message) return;
+    
+    sendMessage(message);
+    
+    chatInput.value = '';
+    chatInput.style.height = 'auto';
+    updateCharCount();
+    updateSendButton();
+});
+
+chatInput.addEventListener('input', function() {
+    updateCharCount();
+    updateSendButton();
+    autoResize();
+});
+
+chatInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        
+        if (chatInput.value.trim()) {
+            chatForm.dispatchEvent(new Event('submit'));
+        }
+    }
+});
+
+function updateCharCount() {
+    const count = chatInput.value.length;
+    charCount.textContent = count;
+    
+    if (count > 2000) {
+        charCount.classList.add('text-red-500');
+    } else {
+        charCount.classList.remove('text-red-500');
+    }
+}
+
+function updateSendButton() {
+    const hasText = chatInput.value.trim().length > 0;
+    sendBtn.disabled = !hasText;
+}
+
+function autoResize() {
+    chatInput.style.height = 'auto';
+    chatInput.style.height = Math.min(chatInput.scrollHeight, 128) + 'px';
+}
+
+// ============================================
+// AI TUTOR - SEND MESSAGE
+// ============================================
+
+async function sendMessage(message) {
+    console.log('📤 Sending:', message.substring(0, 50));
+    
+    if (!suggestedQuestions.classList.contains('hidden')) {
+        hideSuggestedQuestions();
+    }
+    
+    addUserMessage(message);
+    showTypingIndicator();
+    scrollToBottom();
+    
+    try {
+        const response = await inviaRichiesta('POST', '/chat', {
+            prompt: message,
+            testoDocumento: testoEstratto || ""
+        });
+        
+        hideTypingIndicator();
+        
+        if (response.status == 200) {
+            addAIMessage(response.data.response);
+            
+            chatHistory.push({
+                user: message,
+                ai: response.response,
+                timestamp: new Date()
+            });
+            
+            console.log('✅ Success');
+        } else {
+            throw new Error(response.error || 'Unknown error');
+        }
+        
+    } catch (error) {
+        console.error('❌ Error:', error);
+        hideTypingIndicator();
+        
+        let errorMsg = '⚠️ Si è verificato un errore.';
+        if (!testoEstratto) {
+            errorMsg = '⚠️ Nessun documento caricato.';
+        }
+        addAIMessage(errorMsg);
+    }
+    
+    scrollToBottom();
+}
+
+// ============================================
+// AI TUTOR - ADD MESSAGES
+// ============================================
+
+function addUserMessage(message) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'flex justify-end animate-slide-in-right';
+    
+    messageDiv.innerHTML = `
+        <div class="max-w-3xl">
+            <div class="bg-linear-to-r from-indigo-600 to-purple-600 text-white rounded-2xl rounded-tr-none px-5 py-3 shadow-md">
+                <p class="text-sm leading-relaxed whitespace-pre-wrap wrap-break-word">${escapeHtml(message)}</p>
+            </div>
+            <p class="text-xs text-gray-400 mt-1 text-right">${getCurrentTime()}</p>
+        </div>
+    `;
+    
+    chatMessages.appendChild(messageDiv);
+}
+
+function addAIMessage(message) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'flex items-start gap-3 max-w-3xl animate-slide-in-left';
+    
+    messageDiv.innerHTML = `
+        <div class="w-8 h-8 rounded-full bg-linear-to-br from-blue-500 to-cyan-600 flex items-center justify-center shrink-0">
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+            </svg>
+        </div>
+        
+        <div class="flex-1">
+            <div class="bg-white rounded-2xl rounded-tl-none px-5 py-3 shadow-sm border border-gray-200">
+                ${formatAIMessage(message)}
+            </div>
+            <p class="text-xs text-gray-400 mt-1">${getCurrentTime()}</p>
+        </div>
+    `;
+    
+    chatMessages.appendChild(messageDiv);
+}
+
+function formatAIMessage(text) {
+    text = escapeHtml(text);
+    text = text.replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold">$1</strong>');
+    text = text.replace(/\*(.*?)\*/g, '<em class="italic">$1</em>');
+    text = text.replace(/`(.*?)`/g, '<code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm font-mono text-indigo-600">$1</code>');
+    text = text.replace(/^- (.+)$/gm, '<li class="ml-4 mb-1">• $1</li>');
+    text = text.replace(/^\d+\. (.+)$/gm, function(match, content) {
+        const num = match.match(/^(\d+)\./)[1];
+        return `<li class="ml-4 mb-1"><span class="font-semibold">${num}.</span> ${content}</li>`;
+    });
+    text = text.replace(/\n/g, '<br>');
+    
+    return `<div class="prose prose-sm max-w-none text-sm text-gray-800 leading-relaxed">${text}</div>`;
+}
+
+// ============================================
+// AI TUTOR - HELPERS
+// ============================================
+
+function showTypingIndicator() {
+    typingIndicator.classList.remove('hidden');
+    scrollToBottom();
+}
+
+function hideTypingIndicator() {
+    typingIndicator.classList.add('hidden');
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function getCurrentTime() {
+    const now = new Date();
+    return now.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+}
+
+function scrollToBottom() {
+    setTimeout(() => {
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }, 100);
+}
+
+// ============================================
+// FLASHCARD FUNCTIONS
+// ============================================
 
 function caricaDatiFlashcard(){
-    // Reset index
     currentIndex = 0;
     isFlipped = false;
     
-    // Update header
     flashcardCountFlashcardSection.textContent = flashcardGlobal.length + " Flashcard Generate";
     totalNum.textContent = flashcardGlobal.length;
     currentNum.textContent = "1";
     
-    // Render prima card
     renderCard();
 }
 
@@ -523,10 +748,6 @@ function caricaDatiQuiz() {
     renderQuestion();
 }
 
-// ============================================
-// RENDER CARD (crea HTML)
-// ============================================
-
 function renderCard() {
     if (flashcardGlobal.length === 0) {
         flashcardView.innerHTML = '<p class="text-center text-gray-500">Nessuna flashcard disponibile</p>';
@@ -540,7 +761,6 @@ function renderCard() {
          class="relative w-full min-h-72 sm:min-h-80 max-h-80 sm:max-h-96 cursor-pointer transition-transform duration-500" 
          style="transform-style: preserve-3d;">
         
-        <!-- Front -->
         <div class="card-face absolute inset-0 flex items-center justify-center rounded-2xl border-2 border-indigo-100 bg-linear-to-br from-white to-indigo-50 p-6 sm:p-8 shadow-lg overflow-y-auto" 
              style="backface-visibility: hidden;">
             <div class="text-center w-full">
@@ -554,7 +774,6 @@ function renderCard() {
             </div>
         </div>
 
-        <!-- Back -->
         <div class="card-face card-back absolute inset-0 rounded-2xl border-2 border-purple-100 bg-linear-to-br from-indigo-600 to-purple-600 shadow-lg overflow-y-auto" 
              style="backface-visibility: hidden; transform: rotateY(180deg);">
             <div class="p-4 sm:p-6 md:p-8 h-full flex flex-col">
@@ -574,16 +793,11 @@ function renderCard() {
     </div>
     `;
     
-    // Aggiungi event listener
     const cardContainer = document.getElementById('flashcardContainer');
     if (cardContainer) {
         cardContainer.addEventListener('click', flipCard);
     }
 }
-
-// ============================================
-// FLIP CARD (gira la carta)
-// ============================================
 
 function flipCard() {
     const cardContainer = document.getElementById('flashcardContainer');
@@ -597,10 +811,6 @@ function flipCard() {
         cardContainer.style.transform = "rotateY(0deg)";
     }
 }
-
-// ============================================
-// RENDER VISTA GRIGLIA
-// ============================================
 
 function renderGridView() {
     if (flashcardGlobal.length === 0) {
@@ -619,7 +829,6 @@ function renderGridView() {
         cardElement.onclick = () => openCardModal(index);
         
         cardElement.innerHTML = `
-            <!-- Header -->
             <div class="bg-linear-to-r from-indigo-500 to-purple-600 px-4 py-3 flex items-center justify-between w-full">
                 <span class="text-white font-bold text-sm">Card ${index + 1}</span>
                 <svg class="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -628,7 +837,6 @@ function renderGridView() {
                 </svg>
             </div>
             
-            <!-- Question Preview -->
             <div class="p-4 w-full">
                 <div class="flex items-start gap-2 mb-3 w-full">
                     <svg class="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -637,7 +845,6 @@ function renderGridView() {
                     <p class="text-sm font-medium text-gray-800 line-clamp-3 flex-1 min-w-0">${card.front}</p>
                 </div>
                 
-                <!-- Answer Preview -->
                 <div class="border-t border-gray-100 pt-3 mt-3 w-full">
                     <div class="flex items-center gap-2 text-xs text-gray-500">
                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -655,10 +862,6 @@ function renderGridView() {
     gridView.appendChild(gridContainer);
 }
 
-// ============================================
-// MODAL CARD
-// ============================================
-
 function openCardModal(index) {
     const card = flashcardGlobal[index];
     
@@ -671,7 +874,6 @@ function openCardModal(index) {
     
     modal.innerHTML = `
         <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto" onclick="event.stopPropagation()">
-            <!-- Header -->
             <div class="bg-linear-to-r from-indigo-500 to-purple-600 px-6 py-4 flex items-center justify-between rounded-t-2xl">
                 <h3 class="text-white font-bold text-lg">Flashcard ${index + 1} / ${flashcardGlobal.length}</h3>
                 <button onclick="closeCardModal()" class="hover:cursor-pointer text-white hover:bg-white/20 rounded-lg p-2 transition">
@@ -681,9 +883,7 @@ function openCardModal(index) {
                 </button>
             </div>
             
-            <!-- Content -->
             <div class="p-6">
-                <!-- Question -->
                 <div class="mb-6">
                     <div class="flex items-center gap-2 mb-3">
                         <div class="bg-indigo-100 p-2 rounded-lg">
@@ -696,10 +896,8 @@ function openCardModal(index) {
                     <p class="text-lg font-medium text-gray-900 leading-relaxed">${card.front}</p>
                 </div>
                 
-                <!-- Divider -->
                 <div class="border-t border-gray-200 my-6"></div>
                 
-                <!-- Answer -->
                 <div>
                     <div class="flex items-center gap-2 mb-3">
                         <div class="bg-green-100 p-2 rounded-lg">
@@ -713,7 +911,6 @@ function openCardModal(index) {
                 </div>
             </div>
             
-            <!-- Footer -->
             <div class="bg-gray-50 px-6 py-4 flex gap-3 rounded-b-2xl">
                 ${index > 0 ? `
                     <button onclick="closeCardModal(); openCardModal(${index - 1})" class="hover:cursor-pointer flex-1 px-4 py-2 bg-white border-2 border-gray-300 rounded-lg hover:border-indigo-500 transition flex items-center justify-center gap-2">
@@ -733,9 +930,8 @@ function openCardModal(index) {
                     </button>
                 ` : '<div class="flex-1"></div>'}
             </div>
-        </div>
-    `;
-    
+        </div>`
+
     document.body.appendChild(modal);
     document.body.style.overflow = 'hidden';
 }
@@ -748,38 +944,27 @@ function closeCardModal() {
     }
 }
 
-if (tryAgainBtn) {
-  tryAgainBtn.addEventListener('click', () => {
-    resultsState.classList.add('hidden');
-    uploadArea.classList.remove('hidden');
-    fileInput.value = '';
-    filePreview.classList.add('hidden');
-  });
-}
-
-if (viewResultsBtn) {
-  viewResultsBtn.addEventListener('click', () => {
-    window.location.href = 'upload.html';
+if (newUploadBtn) {
+  newUploadBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    fileInput.click();
   });
 }
 
 function formatFileSize(bytes) {
   if (bytes === 0) return '0 Bytes';
-  const k     = 1024;
+  const k = 1024;
   const sizes = ['Bytes', 'KB', 'MB'];
-  const i     = Math.floor(Math.log(bytes) / Math.log(k));
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
   return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
 }
 
-//Download pdf con quiz e flashcard
 function scaricaTutto() {
     console.log('📄 Generando PDF...');
     
-    // ✅ PARSE se sono stringhe
     let flashcards = flashcardGlobal;
     let quiz = quizGlobal
     
-    // Se sono stringhe, parse
     if (typeof flashcards === 'string') {
         flashcards = JSON.parse(flashcards);
     }
@@ -798,16 +983,10 @@ function scaricaTutto() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ unit: 'mm', format: 'a4' });
     
-    // ... resto codice PDF ...
-    
     let yPosition = 20;
     const pageHeight = doc.internal.pageSize.height;
     const margin = 20;
     const lineHeight = 7;
-    
-    // ============================================
-    // TITOLO
-    // ============================================
     
     doc.setFontSize(20);
     doc.setFont('helvetica', 'bold');
@@ -819,13 +998,8 @@ function scaricaTutto() {
     doc.text(`Generato da: ${documentTitle.textContent}`, margin, yPosition);
     yPosition += 10;
     
-    // Linea separatore
     doc.line(margin, yPosition, 190, yPosition);
     yPosition += 10;
-    
-    // ============================================
-    // SEZIONE FLASHCARD
-    // ============================================
     
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
@@ -837,23 +1011,19 @@ function scaricaTutto() {
     
     if (flashcards && flashcards.length > 0) {
         flashcards.forEach((card, index) => {
-            // Controlla se serve nuova pagina
             if (yPosition > pageHeight - 40) {
                 doc.addPage();
                 yPosition = 20;
             }
             
-            // Numero flashcard
             doc.setFont('helvetica', 'bold');
             doc.text(`${index + 1}.`, margin, yPosition);
             
-            // Domanda (front)
             doc.setFont('helvetica', 'bold');
             const frontLines = doc.splitTextToSize(`Q: ${card.front}`, 160);
             doc.text(frontLines, margin + 10, yPosition);
             yPosition += frontLines.length * lineHeight;
             
-            // Risposta (back)
             doc.setFont('helvetica', 'normal');
             const backLines = doc.splitTextToSize(`A: ${card.back}`, 160);
             doc.text(backLines, margin + 10, yPosition);
@@ -866,11 +1036,6 @@ function scaricaTutto() {
     
     yPosition += 10;
     
-    // ============================================
-    // SEZIONE QUIZ
-    // ============================================
-    
-    // Nuova pagina per quiz
     doc.addPage();
     yPosition = 20;
     
@@ -884,23 +1049,20 @@ function scaricaTutto() {
     
     if (quiz && quiz.length > 0) {
         quiz.forEach((q, index) => {
-            // Controlla se serve nuova pagina
             if (yPosition > pageHeight - 60) {
                 doc.addPage();
                 yPosition = 20;
             }
             
-            // Domanda
             doc.setFont('helvetica', 'bold');
             const questionLines = doc.splitTextToSize(`${index + 1}. ${q.question}`, 160);
             doc.text(questionLines, margin, yPosition);
             yPosition += questionLines.length * lineHeight + 3;
             
-            // Opzioni
             doc.setFont('helvetica', 'normal');
             q.options.forEach((option, optIndex) => {
                 const isCorrect = optIndex === q.correct;
-                const prefix = String.fromCharCode(65 + optIndex); // A, B, C, D
+                const prefix = String.fromCharCode(65 + optIndex);
                 
                 if (isCorrect) {
                     doc.setFont('helvetica', 'bold');
@@ -918,10 +1080,6 @@ function scaricaTutto() {
     } else {
         doc.text('Nessun quiz generato.', margin, yPosition);
     }
-    
-    // ============================================
-    // SALVA PDF
-    // ============================================
     
     const filename = `SmartLearn_${documentTitle.textContent.replace('.pdf', '')}_${Date.now()}.pdf`;
     doc.save(filename);

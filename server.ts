@@ -343,7 +343,64 @@ app.post("/api/upload", upload.single("file"), async function(req, res) {
     }
 });
 
+app.post("/api/chat", upload.single("file"), async function(req, res) {
+    const prompt = req.body.prompt
+    const testo = req.body.testoDocumento
 
+    console.log('💬 Chat request');
+        console.log('   Message:', prompt?.substring(0, 100));
+        console.log('   Context size:', testo?.length || 0);
+        
+        if (!prompt || typeof prompt !== 'string') {
+            return res.status(400).json({ 
+                success: false, 
+                error: "Message is required" 
+            });
+        }
+        
+        // ✅ COSTRUISCI PROMPT CON RAG
+        let fullPrompt;
+        
+        if (testo && testo.length > 0) {
+            // L'utente ha caricato un documento - USA RAG
+            fullPrompt = `Sei un tutor AI esperto che aiuta studenti a studiare.
+            HAI ACCESSO AL SEGUENTE DOCUMENTO CARICATO DALLO STUDENTE:
+
+            ===== DOCUMENTO =====
+            ${testo}
+            ===== FINE DOCUMENTO =====
+
+            ISTRUZIONI:
+            1. Rispondi SOLO basandoti sul contenuto di questo documento
+            2. Se la domanda non riguarda il documento, rispondi gentilmente che puoi aiutare solo con il materiale fornito
+            3. Sii chiaro, conciso ed educativo
+            4. Usa esempi dal documento quando possibile
+            5. Se citi qualcosa, riferisciti esplicitamente al documento
+
+            DOMANDA DELLO STUDENTE:
+            ${prompt}
+
+            RISPOSTA (basata sul documento):`;
+        } else {
+            // Nessun documento - invita a caricarlo
+            fullPrompt = `Sei un tutor AI che aiuta gli studenti.
+            IMPORTANTE: Lo studente non ha ancora caricato nessun documento. Invitalo gentilmente a caricare un PDF per ricevere assistenza personalizzata sul materiale di studio.
+            DOMANDA:
+            ${prompt}
+            RISPOSTA:`;
+        }
+        console.log('🤖 Calling Gemini...');
+        
+        // ✅ CHIAMATA A GEMINI 2.5 FLASH
+        const response = await genAI.models.generateContent({ 
+            model: "gemini-2.5-flash",
+            contents:fullPrompt
+        });
+        
+        console.log('✅ Response generated:', response.text!, 'chars');
+        
+        res.send({response: response.text});
+});
 
 app.get("/api/:collection",async function(req:any,res,next) {
     const selectedCollection = req.params.collection
