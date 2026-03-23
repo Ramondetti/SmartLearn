@@ -11,6 +11,8 @@ import cors from "cors"
 import multer from 'multer'
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { GoogleGenAI } from "@google/genai";
+import Tesseract, { createWorker } from 'tesseract.js';
+import sharp from 'sharp';
 
 //grazie a @type di express, visual studio riconosce implicitamente i tipi e li associa
 //automaticamente
@@ -125,23 +127,20 @@ const corsOptions = {
 app.use("/", cors(corsOptions));
 
 //E. gestione delle risorse dinamiche
-//USARE FORSE OLLAMA, RISOLVERE PROBLEMA
 // ============================================
-// HELPER: Parse JSON robusto
+// HELPER: Extract JSON
 // ============================================
 
 function extractJSON(text: string): any[] {
-    console.log('🔍 Extracting JSON from AI response...');
+    console.log('🔍 Extracting JSON...');
     
-    // Rimuovi markdown
     text = text.replace(/```json/gi, '').replace(/```/g, '');
     
-    // Trova primo [ e ultimo ]
     const start = text.indexOf('[');
     const end = text.lastIndexOf(']');
     
     if (start === -1 || end === -1 || start > end) {
-        console.warn('⚠️ No valid JSON array found');
+        console.warn('⚠️ No JSON array found');
         return [];
     }
     
@@ -156,9 +155,8 @@ function extractJSON(text: string): any[] {
         const parsed = JSON.parse(jsonStr);
         return Array.isArray(parsed) ? parsed : [];
     } catch (error: any) {
-        console.error('❌ JSON parse error:', error.message);
+        console.error('❌ Parse error:', error.message);
         
-        // Tentativo riparazione
         try {
             const repaired = jsonStr
                 .replace(/'/g, '"')
@@ -173,11 +171,133 @@ function extractJSON(text: string): any[] {
 }
 
 // ============================================
-// UPLOAD ENDPOINT - VERSIONE ROBUSTA E VELOCE
+// OCR CON TESSERACT
+// ============================================
+
+async function extractTextWithOCR(filePath: string): Promise<string> {
+    let worker: Tesseract.Worker | null = null;
+    let processedPath = filePath;
+    
+    try {
+        console.log('🔍 Starting OCR with Tesseract for:', filePath);
+        
+        // ✅ Usa setTimeout per dare tempo a Sharp di chiudere il file
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Crea worker
+        worker = await createWorker('ita', 1, {
+            logger: m => {
+                if (m.status === 'recognizing text') {
+                    console.log(`OCR Progress: ${Math.round(m.progress * 100)}%`);
+                }
+            }
+        });
+        
+        // Esegui OCR
+        const { data: { text } } = await worker.recognize(processedPath);
+        
+        // ✅ CLEANUP WORKER PRIMA
+        await worker.terminate();
+        worker = null;
+        
+        // ✅ Aspetta prima di eliminare file
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Elimina file processato
+        if (processedPath !== filePath) {
+            try {
+                await fs.promises.unlink(processedPath);
+                console.log('✅ Deleted processed image');
+            } catch (err: any) {
+                console.warn('⚠️ Could not delete processed image:', err.message);
+            }
+        }
+        
+        // Pulizia testo
+        const cleanedText = text
+            .replace(/\n{3,}/g, '\n\n')
+            .replace(/[^\x00-\x7F\u00C0-\u00FF\n\t]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+        
+        console.log('✅ OCR completed:', cleanedText.length, 'chars');
+        
+        // ✅ Debug: mostra testo estratto
+        console.log('📝 OCR Text Preview:', cleanedText.substring(0, 200));
+        
+        return cleanedText;
+        
+    } catch (error: any) {
+        console.error('❌ OCR error:', error);
+        
+        // Cleanup worker
+        if (worker) {
+            try {
+                await worker.terminate();
+            } catch {}
+        }
+        
+        // Cleanup file processato
+        if (processedPath !== filePath) {
+            try {
+                await new Promise(resolve => setTimeout(resolve, 500));
+                await fs.promises.unlink(processedPath);
+            } catch {}
+        }
+        
+        throw new Error('OCR fallito: ' + error.message);
+    }
+}
+
+// ============================================
+// UNIVERSAL TEXT EXTRACTION
+// ============================================
+
+async function extractText(filePath: string, mimeType: string): Promise<string> {
+    console.log('📄 Extracting text from:', mimeType);
+    
+    // PDF Nativo
+    if (mimeType === 'application/pdf') {
+        try {
+            const dataBuffer = await fs.promises.readFile(filePath);
+            const uint8Array = new Uint8Array(dataBuffer);
+            const pdf = await pdfjsLib.getDocument({ data: uint8Array }).promise;
+            
+            let text = '';
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const content = await page.getTextContent();
+                text += content.items.map((item: any) => item.str).join(' ') + '\n';
+            }
+            
+            text = text.replace(/\s+/g, ' ').trim();
+            
+            if (text.length < 100) {
+                console.warn('⚠️ PDF appears to be scanned, using OCR...');
+                return await extractTextWithOCR(filePath);
+            }
+            
+            return text;
+            
+        } catch (error) {
+            console.error('❌ PDF extraction failed:', error);
+            throw error;
+        }
+    }
+    
+    // Immagini - Usa OCR
+    if (mimeType === 'image/jpeg' || mimeType === 'image/png' || mimeType === 'image/jpg') {
+        return await extractTextWithOCR(filePath);
+    }
+    
+    throw new Error('Tipo file non supportato: ' + mimeType);
+}
+
+// ============================================
+// UPLOAD ENDPOINT OCR DA IMPLEMENTARE
 // ============================================
 
 app.post("/api/upload", upload.single("file"), async function(req, res) {
-    // ── Setup SSE ──
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
@@ -187,39 +307,74 @@ app.post("/api/upload", upload.single("file"), async function(req, res) {
         res.write(`data: ${JSON.stringify({ step, pct, msg })}\n\n`);
     };
 
+    // ✅ Variabile per tracciare se la risposta è chiusa
+    let responseEnded = false;
+    
+    // ✅ Helper per terminare risposta in modo sicuro
+    const safeEnd = () => {
+        if (!responseEnded) {
+            res.end();
+            responseEnded = true;
+        }
+    };
+    
+    const safeWrite = (data: string) => {
+        if (!responseEnded) {
+            res.write(data);
+        }
+    };
+
     try {
         const filePath: any = req.file?.path;
         const mimeType = req.file?.mimetype;
 
-        if (mimeType !== "application/pdf") {
-            fs.unlinkSync(filePath);
-            res.write(`data: ${JSON.stringify({ error: "Solo PDF supportati" })}\n\n`);
-            return res.end();
+        const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+        if (!allowedTypes.includes(mimeType!)) {
+            // ✅ Aspetta prima di eliminare
+            await new Promise(resolve => setTimeout(resolve, 500));
+            await fs.promises.unlink(filePath);
+            
+            safeWrite(`data: ${JSON.stringify({ error: "Tipo file non supportato. Usa PDF, JPG o PNG" })}\n\n`);
+            return safeEnd();
         }
 
-        // ── Step 1: Lettura PDF ──
-        sendEvent(1, 10, "Lettura del file PDF...");
-        const dataBuffer = await fs.promises.readFile(filePath);
-        const uint8Array = new Uint8Array(dataBuffer);
-        const pdf = await pdfjsLib.getDocument({ data: uint8Array }).promise;
+        sendEvent(1, 10, "Lettura del file...");
 
-        // ── Step 2: Estrazione testo ──
-        sendEvent(1, 20, "Estrazione testo in corso...");
-        let extractedTextFromPdf = "";
-        for (let i = 1; i <= pdf.numPages; i++) {
-            const page = await pdf.getPage(i);
-            const content = await page.getTextContent();
-            extractedTextFromPdf += content.items.map((item: any) => item.str).join(" ") + "\n";
-
-            const pct = 20 + Math.round((i / pdf.numPages) * 15);
-            sendEvent(1, pct, `Analisi pagina ${i} di ${pdf.numPages}...`);
+        // Estrazione testo
+        let extractedTextFromPdf: string;
+        
+        try {
+            if (mimeType!.startsWith('image/')) {
+                sendEvent(1, 15, "🔍 Riconoscimento testo con OCR...");
+            } else {
+                sendEvent(1, 15, "Estrazione testo in corso...");
+            }
+            
+            extractedTextFromPdf = await extractText(filePath, mimeType!);
+            
+            if (!extractedTextFromPdf || extractedTextFromPdf.length < 50) {
+                throw new Error('Testo estratto insufficiente. Assicurati che il documento contenga testo leggibile.');
+            }
+            
+            sendEvent(1, 35, "Testo estratto con successo ✓");
+            console.log('✅ Extracted text:', extractedTextFromPdf.length, 'chars');
+            
+        } catch (extractError: any) {
+            console.error('❌ Text extraction failed:', extractError);
+            
+            // ✅ Cleanup con delay
+            await new Promise(resolve => setTimeout(resolve, 500));
+            try {
+                await fs.promises.unlink(filePath);
+            } catch {}
+            
+            safeWrite(`data: ${JSON.stringify({ 
+                error: extractError.message || 'Estrazione testo fallita'
+            })}\n\n`);
+            return safeEnd();
         }
-        extractedTextFromPdf = extractedTextFromPdf.replace(/\s+/g, " ").trim();
-        sendEvent(1, 35, "Testo estratto con successo ✓");
 
-        console.log('📄 Extracted text length:', extractedTextFromPdf.length);
-
-        // ── Step 3 & 4: Generazione PARALLELA (più veloce!) ──
+        // Generazione AI
         const MAX_CHARS = 70000;
         const chunks: string[] = [];
         
@@ -228,16 +383,28 @@ app.post("/api/upload", upload.single("file"), async function(req, res) {
         }
 
         console.log('📚 Processing', chunks.length, 'chunks in parallel...');
-        
         sendEvent(2, 40, "Generazione flashcard e quiz...");
 
-        // ✅ GENERA FLASHCARD E QUIZ IN PARALLELO
+        // ✅ PROMPT MIGLIORATI - Gestiscono meglio testo OCR
         const flashcardPromises = chunks.map(async (chunk, index) => {
-            const promptFlashcard = `Genera flashcard di livello avanzato dal testo seguente.
-            Rispondi SOLO con un array JSON senza altre scritte, senza backtick, senza markdown.
-            Se il testo è povero restituisci []
+            const promptFlashcard = `Sei un assistente educativo. Analizza il seguente testo e genera flashcard di studio.
+            TESTO DA ANALIZZARE:
+            """
+            ${chunk}
+            """
+
+            ISTRUZIONI:
+            - Crea flashcard chiare e concise
+            - Ogni domanda deve essere comprensibile
+            - Le risposte devono essere accurate
+            - Se il testo è poco chiaro o troppo breve, genera almeno 2-3 flashcard basandoti sui concetti principali
+
+            FORMATO OUTPUT:
+            Rispondi SOLO con un array JSON valido, senza markdown, senza backtick.
             Formato: [{"front":"Domanda?","back":"Risposta"}]
-            TESTO: "${chunk}"`;
+
+            ESEMPIO:
+            [{"front":"Cos'è il pane?","back":"Un alimento a base di farina, acqua, lievito e sale"}]`;
 
             try {
                 const response = await genAI.models.generateContent({
@@ -247,32 +414,43 @@ app.post("/api/upload", upload.single("file"), async function(req, res) {
 
                 const flashcards = extractJSON(response.text!);
                 
-                // Filtra flashcard valide
                 const valid = flashcards.filter(f =>
                     f?.front && f?.back &&
                     typeof f.front === 'string' &&
                     typeof f.back === 'string' &&
-                    f.front.trim() && f.back.trim()
+                    f.front.trim().length > 5 &&
+                    f.back.trim().length > 5
                 );
 
                 console.log(`✅ Flashcard chunk ${index + 1}: ${valid.length} valid`);
                 return valid;
 
             } catch (error: any) {
-                console.error(`❌ Flashcard chunk ${index + 1} failed:`, error.message);
+                console.error(`❌ Flashcard chunk ${index + 1}:`, error.message);
                 return [];
             }
         });
 
         const quizPromises = chunks.map(async (chunk, index) => {
-            const promptQuiz = `Genera quiz a risposta multipla dal testo seguente.
-            Rispondi SOLO con un array JSON senza altre scritte, senza backtick, senza markdown.
-            Se il testo è povero restituisci []
+            const promptQuiz = `Sei un assistente educativo. Analizza il seguente testo e genera quiz a risposta multipla.
+            TESTO DA ANALIZZARE:
+            """
+            ${chunk}
+            """
+
+            ISTRUZIONI:
+            - Crea domande chiare basate sul testo
+            - 4 opzioni di risposta per ogni domanda
+            - Una sola risposta corretta
+            - Se il testo è poco chiaro, genera comunque 2-3 domande sui concetti principali
+
+            FORMATO OUTPUT:
+            Rispondi SOLO con un array JSON valido, senza markdown, senza backtick.
             Formato: [{"question":"Domanda?","options":["A","B","C","D"],"correct":0}]
-            VINCOLI:
-            - correct deve essere 0, 1, 2 o 3
-            - Esattamente 4 opzioni
-            TESTO: "${chunk}"`;
+            - correct deve essere 0, 1, 2 o 3 (indice della risposta corretta)
+
+            ESEMPIO:
+            [{"question":"Qual è l'ingrediente principale del pane?","options":["Farina","Zucchero","Burro","Olio"],"correct":0}]`;
 
             try {
                 const response = await genAI.models.generateContent({
@@ -282,7 +460,6 @@ app.post("/api/upload", upload.single("file"), async function(req, res) {
 
                 const quizzes = extractJSON(response.text!);
                 
-                // Filtra quiz validi
                 const valid = quizzes.filter(q =>
                     q?.question &&
                     Array.isArray(q.options) &&
@@ -290,19 +467,18 @@ app.post("/api/upload", upload.single("file"), async function(req, res) {
                     typeof q.correct === 'number' &&
                     q.correct >= 0 &&
                     q.correct <= 3 &&
-                    q.options.every((opt: any) => typeof opt === 'string' && opt.trim())
+                    q.options.every((opt: any) => typeof opt === 'string' && opt.trim().length > 0)
                 );
 
                 console.log(`✅ Quiz chunk ${index + 1}: ${valid.length} valid`);
                 return valid;
 
             } catch (error: any) {
-                console.error(`❌ Quiz chunk ${index + 1} failed:`, error.message);
+                console.error(`❌ Quiz chunk ${index + 1}:`, error.message);
                 return [];
             }
         });
 
-        // ✅ ATTENDI TUTTO IN PARALLELO
         sendEvent(2, 50, "Elaborazione in corso...");
         
         const [flashcardResults, quizResults] = await Promise.all([
@@ -310,7 +486,6 @@ app.post("/api/upload", upload.single("file"), async function(req, res) {
             Promise.all(quizPromises)
         ]);
 
-        // Flatten arrays
         const allFlashcards = flashcardResults.flat();
         const allQuizzes = quizResults.flat();
 
@@ -320,29 +495,46 @@ app.post("/api/upload", upload.single("file"), async function(req, res) {
         console.log('✅ Total flashcards:', allFlashcards.length);
         console.log('✅ Total quizzes:', allQuizzes.length);
 
-        // ── Step finale ──
         sendEvent(4, 100, "Tutto pronto! 🚀");
         
-        res.write(`data: ${JSON.stringify({
+        safeWrite(`data: ${JSON.stringify({
             done: true,
             flashcard: JSON.stringify(allFlashcards),
             quiz: JSON.stringify(allQuizzes),
             extractedText: extractedTextFromPdf
         })}\n\n`);
         
-        res.end();
+        safeEnd();
 
-        fs.unlinkSync(filePath);
+        // ✅ CLEANUP FILE ORIGINALE CON DELAY
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        try {
+            await fs.promises.unlink(filePath);
+            console.log('✅ Deleted original file');
+        } catch (err: any) {
+            console.warn('⚠️ Could not delete original file:', err.message);
+        }
 
         console.log('✅ Upload completed successfully');
 
     } catch (error: any) {
         console.error("❌ Errore server:", error);
-        res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
-        res.end();
+        
+        if (!responseEnded) {
+            safeWrite(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+            safeEnd();
+        }
+        
+        // Cleanup file in caso di errore
+        if (req.file?.path) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            try {
+                await fs.promises.unlink(req.file.path);
+            } catch {}
+        }
     }
 });
-
 app.post("/api/chat", upload.single("file"), async function(req, res) {
     const prompt = req.body.prompt
     const testo = req.body.testoDocumento

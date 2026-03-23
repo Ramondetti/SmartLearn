@@ -400,6 +400,36 @@ backToResultsFromAI.addEventListener("click", function() {
     sezioneResults.classList.remove("hidden");
 });
 
+showSectionStartNav.addEventListener("click",function(){
+    homepage.classList.add("hidden")
+    onboardingSection.classList.remove("hidden")
+})
+
+showSectionStartMobile.addEventListener("click",function(){
+    homepage.classList.add("hidden")
+    onboardingSection.classList.remove("hidden")
+})
+
+showSectionStart.addEventListener("click",function(){
+    homepage.classList.add("hidden")
+    onboardingSection.classList.remove("hidden")
+})
+
+showSectionStartLink.addEventListener("click",function(){
+    homepage.classList.add("hidden")
+    onboardingSection.classList.remove("hidden")
+})
+
+showSectionStartCta.addEventListener("click",function(){
+    homepage.classList.add("hidden")
+    onboardingSection.classList.remove("hidden")
+})
+
+showSectionStartCtaTwo.addEventListener("click",function(){
+    homepage.classList.add("hidden")
+    onboardingSection.classList.remove("hidden")
+})
+
 // ============================================
 // AI TUTOR - SUGGESTED QUESTIONS
 // ============================================
@@ -1086,3 +1116,140 @@ function scaricaTutto() {
     
     console.log('✅ PDF generato:', filename);
 }
+
+// ============================================
+// ONBOARDING FLOW
+// ============================================
+
+let onboardingData = {
+    userType: null,
+    subject: null,
+    goal: null,
+    studyTime: null
+};
+
+let currentOnboardingStep = 1;
+const totalSteps = 4;
+
+// ============================================
+// START ONBOARDING (dal pulsante "Inizia")
+// ============================================
+
+function startOnboarding() {
+    homepage.classList.add("hidden");
+    onboardingSection.classList.remove("hidden");
+    currentOnboardingStep = 1;
+    updateOnboardingUI();
+}
+
+// ============================================
+// SELECT OPTION
+// ============================================
+
+function selectOption(step, value) {
+    console.log(`Step ${step}: ${value}`);
+    
+    // Salva dati
+    switch(step) {
+        case 1:
+            onboardingData.userType = value;
+            break;
+        case 2:
+            onboardingData.subject = value;
+            break;
+        case 3:
+            onboardingData.goal = value;
+            break;
+        case 4:
+            onboardingData.studyTime = value;
+            break;
+    }
+    
+    // Animazione selezione
+    const buttons = document.querySelectorAll(`#step${step} button`);
+    buttons.forEach(btn => {
+        btn.classList.remove('border-indigo-600', 'bg-indigo-50');
+    });
+    
+    event.target.closest('button').classList.add('border-indigo-600', 'bg-indigo-50');
+    
+    // Aspetta un attimo per mostrare la selezione
+    setTimeout(() => {
+        if (step < totalSteps) {
+            goToStep(step + 1);
+        } else {
+            completeOnboarding();
+        }
+    }, 300);
+}
+
+// ============================================
+// NAVIGATION
+// ============================================
+
+function goToStep(stepNumber) {
+    currentOnboardingStep = stepNumber;
+    
+    // Nascondi tutti gli step
+    for (let i = 1; i <= totalSteps; i++) {
+        document.getElementById(`step${i}`).classList.add('hidden');
+    }
+    
+    // Mostra step corrente con animazione
+    const currentStepEl = document.getElementById(`step${stepNumber}`);
+    currentStepEl.classList.remove('hidden');
+    currentStepEl.style.animation = 'fadeInUp 0.4s ease-out';
+    
+    updateOnboardingUI();
+}
+
+function goBack() {
+    if (currentOnboardingStep > 1) {
+        goToStep(currentOnboardingStep - 1);
+    }
+}
+
+function updateOnboardingUI() {
+    // Progress bar
+    const progress = (currentOnboardingStep / totalSteps) * 100;
+    document.getElementById('progressBar').style.width = progress + '%';
+    document.getElementById('currentStep').textContent = currentOnboardingStep;
+    document.getElementById('progressPercent').textContent = Math.round(progress);
+    
+    // Back button
+    const backBtn = document.getElementById('backBtn');
+    if (currentOnboardingStep === 1) {
+        backBtn.classList.add('hidden');
+    } else {
+        backBtn.classList.remove('hidden');
+    }
+}
+
+function skipOnboarding() {
+    completeOnboarding();
+}
+
+// ============================================
+// COMPLETE ONBOARDING
+// ============================================
+
+function completeOnboarding() {
+    console.log('✅ Onboarding completato:', onboardingData)
+    onboardingSection.classList.add("hidden")
+    authSection.classList.remove("hidden")
+}
+
+// ============================================
+// CHECK SE ONBOARDING GIÀ COMPLETATO
+// ============================================
+
+window.addEventListener('load', () => {
+    const onboardingCompleted = localStorage.getItem('smartlearn_onboarding_completed');
+    
+    if (!onboardingCompleted) {
+        // Mostra onboarding al primo accesso
+        // startOnboarding();
+        
+        // Oppure lascia che l'utente clicchi "Inizia"
+    }
+});
