@@ -12,11 +12,11 @@ let viewMode = "single";
 // AI TUTOR - VARIABILI GLOBALI
 // ============================================
 let chatHistory = [];
-const suggestedQuestions = document.getElementById('suggestedQuestions');
+/*const suggestedQuestions = document.getElementById('suggestedQuestions');
 const chatMessages = document.getElementById('chatMessages');
 const typingIndicator = document.getElementById('typingIndicator');
 const clearChatBtn = document.getElementById('clearChatBtn');
-const aiTutorInfoBtn = document.getElementById('aiTutorInfoBtn');
+const aiTutorInfoBtn = document.getElementById('aiTutorInfoBtn');*/
 
 // ============================================
 // Mobile Menu Toggle
@@ -428,6 +428,19 @@ showSectionStartCta.addEventListener("click",function(){
 showSectionStartCtaTwo.addEventListener("click",function(){
     homepage.classList.add("hidden")
     onboardingSection.classList.remove("hidden")
+})
+
+showHidePsw.addEventListener("click",function(){
+    if(loginPassword.type == "password"){
+        eyeShowPsw.classList.add("hidden")
+        eyeHidePsw.classList.remove("hidden")
+        loginPassword.type = "text"
+    }
+    else{
+        eyeShowPsw.classList.remove("hidden")
+        eyeHidePsw.classList.add("hidden")
+        loginPassword.type = "password"
+    }
 })
 
 // ============================================
@@ -1238,18 +1251,3 @@ function completeOnboarding() {
     onboardingSection.classList.add("hidden")
     authSection.classList.remove("hidden")
 }
-
-// ============================================
-// CHECK SE ONBOARDING GIÀ COMPLETATO
-// ============================================
-
-window.addEventListener('load', () => {
-    const onboardingCompleted = localStorage.getItem('smartlearn_onboarding_completed');
-    
-    if (!onboardingCompleted) {
-        // Mostra onboarding al primo accesso
-        // startOnboarding();
-        
-        // Oppure lascia che l'utente clicchi "Inizia"
-    }
-});
