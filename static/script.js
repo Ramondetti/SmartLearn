@@ -443,6 +443,65 @@ showHidePsw.addEventListener("click",function(){
     }
 })
 
+loginTab.addEventListener("click",function(){
+   loginForm.classList.remove("hidden")
+   signupForm.classList.add("hidden")
+   cambiaGraficaBottone(loginTab)
+})
+
+signupTab.addEventListener("click",function(){
+   loginForm.classList.add("hidden")
+   signupForm.classList.remove("hidden")
+   cambiaGraficaBottone(signupTab)
+})
+
+showHidePswSignup.addEventListener("click",function(){
+    if(signupPassword.type == "password"){
+    eyeShowPswSignUp.classList.add("hidden")
+    eyeHidePswSignUp.classList.remove("hidden")
+    signupPassword.type = "text"
+}
+else{
+    eyeShowPswSignUp.classList.remove("hidden")
+    eyeHidePswSignUp.classList.add("hidden")
+    signupPassword.type = "password"
+}
+})
+
+function cambiaGraficaBottone(button){
+    button.classList.add("text-indigo-600","shadow-md","bg-white")
+    button.classList.remove("hover:text-gray-900","text-gray-600","hover:bg-white/50")
+    const nearButton = button.nextElementSibling || button.previousElementSibling
+    nearButton.classList.remove("text-indigo-600","shadow-md","bg-white")
+    nearButton.classList.add("text-gray-600","hover:text-gray-900")    
+}
+
+async function handleLogin(event){
+    event.preventDefault()
+    const httResponse = await inviaRichiesta("POST","/login",{"username":loginEmail.value,"password":loginPassword.value})
+        if(httResponse.status == 200){
+        console.log(httResponse.data)
+        authSection.classList.add("hidden")
+        dashboard.classList.remove("hidden")
+        }
+    else
+        alert(httResponse.status + " : " + httResponse.err)
+}
+
+async function handleSignup(event){
+    event.preventDefault()
+    const httResponse = await inviaRichiesta("POST","/registrazione",{"nome":signupName.value,"password":loginPassword.value,
+        "email":signupEmail.value
+    })
+        if(httResponse.status == 200){
+        console.log(httResponse.data)
+        authSection.classList.add("hidden")
+        dashboard.classList.remove("hidden")
+        }
+    else
+        alert(httResponse.status + " : " + httResponse.err)
+}
+
 // ============================================
 // AI TUTOR - SUGGESTED QUESTIONS
 // ============================================

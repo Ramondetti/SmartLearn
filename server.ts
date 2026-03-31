@@ -122,7 +122,7 @@ const cookiesOption:CookieOptions = {
 }
 
 app.post("/api/login",async function(req,res,next){
-    const username = req.body.username
+    const email = req.body.username
     const password = req.body.password
 
     const client = new MongoClient(connectionString!)
@@ -130,10 +130,10 @@ app.post("/api/login",async function(req,res,next){
         res.status(503).send("Errore di connessione al dbms")
         return
     })
-    const db = client.db(dbName)
-    const collection = client.db(dbName).collection("mails")
-    //la ricerca sarà case sensitive
-    const cmd = collection.findOne({username})
+
+    const collection = client.db(dbName).collection("utenti")
+
+    const cmd = collection.findOne({"email":email})
 
     cmd.catch(function(err){
         res.status(500).send("Errore esecuzione query: " + err)
@@ -143,7 +143,7 @@ app.post("/api/login",async function(req,res,next){
         if(!dbUser)
             res.status(401).send("Username non valido")
         else{
-            console.log("Passord ricevuta: ", password, "Password DB: ", dbUser.password)
+            //console.log("Passord ricevuta: ", password, "Password DB: ", dbUser.password)
             bcrypt.compare(password,dbUser.password, function(err,ok){
                 if(err){
                     res.status(500).send("bcrypt execution error")
@@ -182,6 +182,372 @@ function createToken(data:any){
     console.log("Creato nuovo token: ", token)
     return token
 }
+
+app.post("/api/registrazione",async function(req,res,next){
+    const nome = req.body.nome
+    const email = req.body.email
+    const password = req.body.password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const client = new MongoClient(connectionString!)
+    await client.connect().catch(function(err){
+        res.status(503).send("Errore di connessione al dbms")
+        return
+    })
+    const collection = client.db(dbName).collection("utenti")
+
+    const existingUser = await collection.findOne({ email })
+
+    if (existingUser) {
+        client.close()
+        return res.status(400).send("Email già registrata")
+    }
+
+    const cmd = collection.insertOne({
+        nome,
+        email,
+        "password": hashedPassword
+    })
+
+    cmd.catch(function(err){
+        res.status(500).send("Errore esecuzione query: " + err)
+    })
+
+    cmd.then(function(data){
+        const token = createToken({
+            "_id":data.insertedId,
+            "email":email
+        })
+        res.cookie("token",token,cookiesOption)
+        console.log("Cookie: ", res.getHeader("set-cookie"))
+        res.send(data)
+    })
+
+    cmd.finally(function(){
+        client.close()
+    })
+
+})
+
+app.post("/api/upload", upload.single("file"), async function(req, res) {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders();
+
+    const sendEvent = (step: number, pct: number, msg: string) => {
+        res.write(`data: ${JSON.stringify({ step, pct, msg })}\n\n`);
+    };
+
+    let responseEnded = false;
+    
+    const safeEnd = () => {
+        if (!responseEnded) {
+            res.end();
+            responseEnded = true;
+        }
+    };
+    
+    const safeWrite = (data: string) => {
+        if (!responseEnded) {
+            res.write(data);
+        }
+    };
+
+    try {
+        const filePath: any = req.file?.path;
+        const mimeType = req.file?.mimetype;
+
+        const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+        if (!allowedTypes.includes(mimeType!)) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            await fs.promises.unlink(filePath);
+            
+            safeWrite(`data: ${JSON.stringify({ error: "Tipo file non supportato. Usa PDF, JPG o PNG" })}\n\n`);
+            return safeEnd();
+        }
+
+        sendEvent(1, 10, "Lettura del file...");
+
+        let extractedTextFromPdf: string;
+        
+        try {
+            if (mimeType!.startsWith('image/')) {
+                sendEvent(1, 15, "🔍 Riconoscimento testo con OCR...");
+            } else {
+                sendEvent(1, 15, "Estrazione testo in corso...");
+            }
+            
+            extractedTextFromPdf = await extractText(filePath, mimeType!);
+            
+            if (!extractedTextFromPdf || extractedTextFromPdf.length < 50) {
+                throw new Error('Testo estratto insufficiente. Assicurati che il documento contenga testo leggibile.');
+            }
+            
+            sendEvent(1, 35, "Testo estratto con successo ✓");
+            console.log('✅ Extracted text:', extractedTextFromPdf.length, 'chars');
+            
+        } catch (extractError: any) {
+            console.error('❌ Text extraction failed:', extractError);
+            
+            await new Promise(resolve => setTimeout(resolve, 500));
+            try {
+                await fs.promises.unlink(filePath);
+            } catch {}
+            
+            safeWrite(`data: ${JSON.stringify({ 
+                error: extractError.message || 'Estrazione testo fallita'
+            })}\n\n`);
+            return safeEnd();
+        }
+
+        const MAX_CHARS = 70000;
+        const chunks: string[] = [];
+        
+        for (let i = 0; i < extractedTextFromPdf.length; i += MAX_CHARS) {
+            chunks.push(extractedTextFromPdf.substring(i, i + MAX_CHARS));
+        }
+
+        console.log('📚 Processing', chunks.length, 'chunks...');
+        sendEvent(2, 40, "Generazione flashcard e quiz...");
+
+        // ✅ GENERAZIONE CON RETRY
+        const flashcardPromises = chunks.map(async (chunk, index) => {
+            const promptFlashcard = `Sei un assistente educativo. Analizza il testo e genera flashcard di studio.
+                TESTO:
+                """
+                ${chunk.substring(0, 60000)}
+                """
+
+                ISTRUZIONI CRITICHE:
+                1. Genera quante più flashcard possibili che abbiano senso ma massimo 20
+                2. Ogni domanda deve essere chiara e specifica
+                3. Ogni risposta deve essere accurata e completa
+                4. Usa SOLO questo formato JSON (niente testo extra, niente markdown):
+
+                [
+                {"front": "Prima domanda?", "back": "Prima risposta dettagliata"},
+                {"front": "Seconda domanda?", "back": "Seconda risposta dettagliata"},
+                {"front": "Terza domanda?", "back": "Terza risposta dettagliata"},
+                {"front": "Quarta domanda?", "back": "Quarta risposta dettagliata"},
+                {"front": "Quinta domanda?", "back": "Quinta risposta dettagliata"}
+                ]
+
+                IMPORTANTE: Rispondi SOLO con l'array JSON, nient'altro.`;
+
+            try {
+                const items = await generateWithRetry(promptFlashcard, 'flashcard');
+                console.log(`✅ Flashcard chunk ${index + 1}: ${items.length} valid`);
+                return items;
+            } catch (error: any) {
+                console.error(`❌ Flashcard chunk ${index + 1} failed:`, error.message);
+                return [];
+            }
+        });
+
+        const quizPromises = chunks.map(async (chunk, index) => {
+            const promptQuiz = `Sei un assistente educativo. Analizza il testo e genera quiz a risposta multipla.
+            TESTO:
+            """
+            ${chunk.substring(0, 60000)}
+            """
+
+            ISTRUZIONI CRITICHE:
+            1. Genera quanti più quiz possibili che abbiano senso
+            2. Ogni quiz deve avere 4 opzioni
+            3. Solo 1 risposta corretta per quiz
+            4. Usa SOLO questo formato JSON (niente testo extra, niente markdown):
+
+            [
+            {"question": "Prima domanda?", "options": ["Risposta A", "Risposta B", "Risposta C", "Risposta D"], "correct": 0},
+            {"question": "Seconda domanda?", "options": ["Risposta A", "Risposta B", "Risposta C", "Risposta D"], "correct": 1},
+            {"question": "Terza domanda?", "options": ["Risposta A", "Risposta B", "Risposta C", "Risposta D"], "correct": 2},
+            {"question": "Quarta domanda?", "options": ["Risposta A", "Risposta B", "Risposta C", "Risposta D"], "correct": 3},
+            {"question": "Quinta domanda?", "options": ["Risposta A", "Risposta B", "Risposta C", "Risposta D"], "correct": 0}
+            ]
+
+            IMPORTANTE:
+            - "correct" deve essere 0, 1, 2, o 3 (indice dell'opzione corretta)
+            - Rispondi SOLO con l'array JSON, nient'altro.`;
+
+            try {
+                const items = await generateWithRetry(promptQuiz, 'quiz');
+                console.log(`✅ Quiz chunk ${index + 1}: ${items.length} valid`);
+                return items;
+            } catch (error: any) {
+                console.error(`❌ Quiz chunk ${index + 1} failed:`, error.message);
+                return [];
+            }
+        });
+
+        sendEvent(2, 50, "Elaborazione in corso...");
+        
+        const [flashcardResults, quizResults] = await Promise.all([
+            Promise.all(flashcardPromises),
+            Promise.all(quizPromises)
+        ]);
+
+        const allFlashcards = flashcardResults.flat();
+        const allQuizzes = quizResults.flat();
+
+        // ✅ FALLBACK: Se poche flashcard/quiz, genera minimo garantito
+        if (allFlashcards.length < 3) {
+            console.warn('⚠️ Too few flashcards, generating fallback...');
+            sendEvent(2, 70, "Generazione flashcard aggiuntive...");
+            
+            const fallbackFlashcards = [
+                {
+                    front: "Qual è il tema principale del documento?",
+                    back: extractedTextFromPdf.substring(0, 200) + "..."
+                },
+                {
+                    front: "Quali sono i punti chiave trattati?",
+                    back: "Il documento tratta vari argomenti che richiedono studio approfondito."
+                },
+                {
+                    front: "Come posso approfondire questo argomento?",
+                    back: "Rileggi il documento e crea le tue note personali."
+                }
+            ];
+            
+            allFlashcards.push(...fallbackFlashcards);
+        }
+
+        sendEvent(2, 90, `Flashcard: ${allFlashcards.length} ✓`);
+        sendEvent(3, 95, `Quiz: ${allQuizzes.length} ✓`);
+
+        console.log('✅ Total flashcards:', allFlashcards.length);
+        console.log('✅ Total quizzes:', allQuizzes.length);
+
+        sendEvent(4, 100, "Tutto pronto! 🚀");
+        
+        safeWrite(`data: ${JSON.stringify({
+            done: true,
+            flashcard: JSON.stringify(allFlashcards),
+            quiz: JSON.stringify(allQuizzes),
+            extractedText: extractedTextFromPdf
+        })}\n\n`);
+        
+        safeEnd();
+
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        try {
+            await fs.promises.unlink(filePath);
+            console.log('✅ Deleted original file');
+        } catch (err: any) {
+            console.warn('⚠️ Could not delete original file:', err.message);
+        }
+
+        console.log('✅ Upload completed successfully');
+
+    } catch (error: any) {
+        console.error("❌ Errore server:", error);
+        
+        if (!responseEnded) {
+            safeWrite(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+            safeEnd();
+        }
+        
+        if (req.file?.path) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            try {
+                await fs.promises.unlink(req.file.path);
+            } catch {}
+        }
+    }
+});
+
+app.post("/api/chat", async function(req, res) {
+    const prompt = req.body.message || req.body.prompt
+    const testo = req.body.context || req.body.testoDocumento
+
+    console.log('💬 Chat request');
+    console.log('   Message:', prompt?.substring(0, 100));
+    console.log('   Context size:', testo?.length || 0);
+    
+    if (!prompt || typeof prompt !== 'string') {
+        return res.status(400).json({ 
+            success: false, 
+            error: "Message is required" 
+        });
+    }
+    
+    try {
+        let fullPrompt;
+        
+        if (testo && testo.length > 0) {
+            fullPrompt = `Sei un tutor AI esperto che aiuta studenti a studiare.
+            HAI ACCESSO AL SEGUENTE DOCUMENTO:
+
+            ===== DOCUMENTO =====
+            ${testo.substring(0, 100000)}
+            ===== FINE DOCUMENTO =====
+
+            ISTRUZIONI:
+            1. Rispondi basandoti sul documento
+            2. Sii chiaro e conciso
+            3. Usa esempi dal documento
+
+            DOMANDA: ${prompt}
+
+            RISPOSTA:`;
+                    } else {
+                        fullPrompt = `Sei un tutor AI. Lo studente non ha caricato documenti. Invitalo gentilmente a caricare un PDF.
+            DOMANDA: ${prompt}
+            RISPOSTA:`
+                    }
+        
+        console.log('🤖 Calling Gemini...');
+        
+        const response = await genAI.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: fullPrompt
+        });
+        
+        console.log('✅ Response generated')
+        
+        res.json({
+            success: true,
+            response: response.text
+        });
+        
+    } catch (error: any) {
+        console.error('❌ Chat error:', error)
+        res.status(500).json({
+            success: false,
+            error: 'Errore nella generazione della risposta'
+        });
+    }
+});
+
+
+
+//2. Controllo token
+//la richiamo solo quando richiedo una risorsa /api
+app.use("/api", function(req:any,res,next){
+    //cookie è la collezione dei cookies, andiamo a vedere se nella collezione
+    //dei cookies c'è un cookie chiamato token
+    if(!req.cookies || !req.cookies.token)
+        res.status(403).send("Token mancante")
+    else{
+        let token = req.cookies.token
+        jwt.verify(token, jwtKey, function(err:any, payload: any){
+            if(err){
+                console.log("Token scaduto o non valido")
+                res.status(403).send("Token non valido o scaduto")
+            }
+            else{
+                //serve a fare in modo che il tempo di scadenza del token sia
+                //aggiornato ricreando il token
+                const newToken = createToken(payload)
+                res.cookie("token",newToken,cookiesOption)
+                req["username"] = payload.username
+                next()
+            }
+        })
+    }
+})
 
 // ============================================
 // EXTRACT JSON - VERSIONE SUPER ROBUSTA
@@ -515,7 +881,7 @@ async function extractText(filePath: string, mimeType: string): Promise<string> 
 async function generateWithRetry(
     prompt: string, 
     type: 'flashcard' | 'quiz',
-    maxRetries: number = 3
+    maxRetries: number = 1
 ): Promise<any[]> {
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -566,302 +932,6 @@ async function generateWithRetry(
     
     return [];
 }
-
-// ============================================
-// UPLOAD ENDPOINT
-// ============================================
-
-app.post("/api/upload", upload.single("file"), async function(req, res) {
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache");
-    res.setHeader("Connection", "keep-alive");
-    res.flushHeaders();
-
-    const sendEvent = (step: number, pct: number, msg: string) => {
-        res.write(`data: ${JSON.stringify({ step, pct, msg })}\n\n`);
-    };
-
-    let responseEnded = false;
-    
-    const safeEnd = () => {
-        if (!responseEnded) {
-            res.end();
-            responseEnded = true;
-        }
-    };
-    
-    const safeWrite = (data: string) => {
-        if (!responseEnded) {
-            res.write(data);
-        }
-    };
-
-    try {
-        const filePath: any = req.file?.path;
-        const mimeType = req.file?.mimetype;
-
-        const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
-        if (!allowedTypes.includes(mimeType!)) {
-            await new Promise(resolve => setTimeout(resolve, 500));
-            await fs.promises.unlink(filePath);
-            
-            safeWrite(`data: ${JSON.stringify({ error: "Tipo file non supportato. Usa PDF, JPG o PNG" })}\n\n`);
-            return safeEnd();
-        }
-
-        sendEvent(1, 10, "Lettura del file...");
-
-        let extractedTextFromPdf: string;
-        
-        try {
-            if (mimeType!.startsWith('image/')) {
-                sendEvent(1, 15, "🔍 Riconoscimento testo con OCR...");
-            } else {
-                sendEvent(1, 15, "Estrazione testo in corso...");
-            }
-            
-            extractedTextFromPdf = await extractText(filePath, mimeType!);
-            
-            if (!extractedTextFromPdf || extractedTextFromPdf.length < 50) {
-                throw new Error('Testo estratto insufficiente. Assicurati che il documento contenga testo leggibile.');
-            }
-            
-            sendEvent(1, 35, "Testo estratto con successo ✓");
-            console.log('✅ Extracted text:', extractedTextFromPdf.length, 'chars');
-            
-        } catch (extractError: any) {
-            console.error('❌ Text extraction failed:', extractError);
-            
-            await new Promise(resolve => setTimeout(resolve, 500));
-            try {
-                await fs.promises.unlink(filePath);
-            } catch {}
-            
-            safeWrite(`data: ${JSON.stringify({ 
-                error: extractError.message || 'Estrazione testo fallita'
-            })}\n\n`);
-            return safeEnd();
-        }
-
-        const MAX_CHARS = 70000;
-        const chunks: string[] = [];
-        
-        for (let i = 0; i < extractedTextFromPdf.length; i += MAX_CHARS) {
-            chunks.push(extractedTextFromPdf.substring(i, i + MAX_CHARS));
-        }
-
-        console.log('📚 Processing', chunks.length, 'chunks...');
-        sendEvent(2, 40, "Generazione flashcard e quiz...");
-
-        // ✅ GENERAZIONE CON RETRY
-        const flashcardPromises = chunks.map(async (chunk, index) => {
-            const promptFlashcard = `Sei un assistente educativo. Analizza il testo e genera esattamente 5 flashcard di studio.
-                TESTO:
-                """
-                ${chunk.substring(0, 60000)}
-                """
-
-                ISTRUZIONI CRITICHE:
-                1. Genera ESATTAMENTE 5 flashcard
-                2. Ogni domanda deve essere chiara e specifica
-                3. Ogni risposta deve essere accurata e completa
-                4. Usa SOLO questo formato JSON (niente testo extra, niente markdown):
-
-                [
-                {"front": "Prima domanda?", "back": "Prima risposta dettagliata"},
-                {"front": "Seconda domanda?", "back": "Seconda risposta dettagliata"},
-                {"front": "Terza domanda?", "back": "Terza risposta dettagliata"},
-                {"front": "Quarta domanda?", "back": "Quarta risposta dettagliata"},
-                {"front": "Quinta domanda?", "back": "Quinta risposta dettagliata"}
-                ]
-
-                IMPORTANTE: Rispondi SOLO con l'array JSON, nient'altro.`;
-
-            try {
-                const items = await generateWithRetry(promptFlashcard, 'flashcard');
-                console.log(`✅ Flashcard chunk ${index + 1}: ${items.length} valid`);
-                return items;
-            } catch (error: any) {
-                console.error(`❌ Flashcard chunk ${index + 1} failed:`, error.message);
-                return [];
-            }
-        });
-
-        const quizPromises = chunks.map(async (chunk, index) => {
-            const promptQuiz = `Sei un assistente educativo. Analizza il testo e genera esattamente 5 quiz a risposta multipla.
-            TESTO:
-            """
-            ${chunk.substring(0, 60000)}
-            """
-
-            ISTRUZIONI CRITICHE:
-            1. Genera ESATTAMENTE 5 quiz
-            2. Ogni quiz deve avere 4 opzioni
-            3. Solo 1 risposta corretta per quiz
-            4. Usa SOLO questo formato JSON (niente testo extra, niente markdown):
-
-            [
-            {"question": "Prima domanda?", "options": ["Risposta A", "Risposta B", "Risposta C", "Risposta D"], "correct": 0},
-            {"question": "Seconda domanda?", "options": ["Risposta A", "Risposta B", "Risposta C", "Risposta D"], "correct": 1},
-            {"question": "Terza domanda?", "options": ["Risposta A", "Risposta B", "Risposta C", "Risposta D"], "correct": 2},
-            {"question": "Quarta domanda?", "options": ["Risposta A", "Risposta B", "Risposta C", "Risposta D"], "correct": 3},
-            {"question": "Quinta domanda?", "options": ["Risposta A", "Risposta B", "Risposta C", "Risposta D"], "correct": 0}
-            ]
-
-            IMPORTANTE:
-            - "correct" deve essere 0, 1, 2, o 3 (indice dell'opzione corretta)
-            - Rispondi SOLO con l'array JSON, nient'altro.`;
-
-            try {
-                const items = await generateWithRetry(promptQuiz, 'quiz');
-                console.log(`✅ Quiz chunk ${index + 1}: ${items.length} valid`);
-                return items;
-            } catch (error: any) {
-                console.error(`❌ Quiz chunk ${index + 1} failed:`, error.message);
-                return [];
-            }
-        });
-
-        sendEvent(2, 50, "Elaborazione in corso...");
-        
-        const [flashcardResults, quizResults] = await Promise.all([
-            Promise.all(flashcardPromises),
-            Promise.all(quizPromises)
-        ]);
-
-        const allFlashcards = flashcardResults.flat();
-        const allQuizzes = quizResults.flat();
-
-        // ✅ FALLBACK: Se poche flashcard/quiz, genera minimo garantito
-        if (allFlashcards.length < 3) {
-            console.warn('⚠️ Too few flashcards, generating fallback...');
-            sendEvent(2, 70, "Generazione flashcard aggiuntive...");
-            
-            const fallbackFlashcards = [
-                {
-                    front: "Qual è il tema principale del documento?",
-                    back: extractedTextFromPdf.substring(0, 200) + "..."
-                },
-                {
-                    front: "Quali sono i punti chiave trattati?",
-                    back: "Il documento tratta vari argomenti che richiedono studio approfondito."
-                },
-                {
-                    front: "Come posso approfondire questo argomento?",
-                    back: "Rileggi il documento e crea le tue note personali."
-                }
-            ];
-            
-            allFlashcards.push(...fallbackFlashcards);
-        }
-
-        sendEvent(2, 90, `Flashcard: ${allFlashcards.length} ✓`);
-        sendEvent(3, 95, `Quiz: ${allQuizzes.length} ✓`);
-
-        console.log('✅ Total flashcards:', allFlashcards.length);
-        console.log('✅ Total quizzes:', allQuizzes.length);
-
-        sendEvent(4, 100, "Tutto pronto! 🚀");
-        
-        safeWrite(`data: ${JSON.stringify({
-            done: true,
-            flashcard: JSON.stringify(allFlashcards),
-            quiz: JSON.stringify(allQuizzes),
-            extractedText: extractedTextFromPdf
-        })}\n\n`);
-        
-        safeEnd();
-
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        try {
-            await fs.promises.unlink(filePath);
-            console.log('✅ Deleted original file');
-        } catch (err: any) {
-            console.warn('⚠️ Could not delete original file:', err.message);
-        }
-
-        console.log('✅ Upload completed successfully');
-
-    } catch (error: any) {
-        console.error("❌ Errore server:", error);
-        
-        if (!responseEnded) {
-            safeWrite(`data: ${JSON.stringify({ error: error.message })}\n\n`);
-            safeEnd();
-        }
-        
-        if (req.file?.path) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            try {
-                await fs.promises.unlink(req.file.path);
-            } catch {}
-        }
-    }
-});
-
-app.post("/api/chat", async function(req, res) {
-    const prompt = req.body.message || req.body.prompt
-    const testo = req.body.context || req.body.testoDocumento
-
-    console.log('💬 Chat request');
-    console.log('   Message:', prompt?.substring(0, 100));
-    console.log('   Context size:', testo?.length || 0);
-    
-    if (!prompt || typeof prompt !== 'string') {
-        return res.status(400).json({ 
-            success: false, 
-            error: "Message is required" 
-        });
-    }
-    
-    try {
-        let fullPrompt;
-        
-        if (testo && testo.length > 0) {
-            fullPrompt = `Sei un tutor AI esperto che aiuta studenti a studiare.
-            HAI ACCESSO AL SEGUENTE DOCUMENTO:
-
-            ===== DOCUMENTO =====
-            ${testo.substring(0, 100000)}
-            ===== FINE DOCUMENTO =====
-
-            ISTRUZIONI:
-            1. Rispondi basandoti sul documento
-            2. Sii chiaro e conciso
-            3. Usa esempi dal documento
-
-            DOMANDA: ${prompt}
-
-            RISPOSTA:`;
-                    } else {
-                        fullPrompt = `Sei un tutor AI. Lo studente non ha caricato documenti. Invitalo gentilmente a caricare un PDF.
-            DOMANDA: ${prompt}
-            RISPOSTA:`;
-                    }
-        
-        console.log('🤖 Calling Gemini...');
-        
-        const response = await genAI.models.generateContent({ 
-            model: "gemini-2.5-flash",
-            contents: fullPrompt
-        });
-        
-        console.log('✅ Response generated');
-        
-        res.json({
-            success: true,
-            response: response.text
-        });
-        
-    } catch (error: any) {
-        console.error('❌ Chat error:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Errore nella generazione della risposta'
-        });
-    }
-});
 
 app.use("/",function(req,res,next){
     res.status(404)
