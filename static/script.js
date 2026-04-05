@@ -12,11 +12,6 @@ let viewMode = "single";
 // AI TUTOR - VARIABILI GLOBALI
 // ============================================
 let chatHistory = [];
-/*const suggestedQuestions = document.getElementById('suggestedQuestions');
-const chatMessages = document.getElementById('chatMessages');
-const typingIndicator = document.getElementById('typingIndicator');
-const clearChatBtn = document.getElementById('clearChatBtn');
-const aiTutorInfoBtn = document.getElementById('aiTutorInfoBtn');*/
 
 // ============================================
 // Mobile Menu Toggle
@@ -480,12 +475,17 @@ async function handleLogin(event){
     event.preventDefault()
     const httResponse = await inviaRichiesta("POST","/login",{"username":loginEmail.value,"password":loginPassword.value})
         if(httResponse.status == 200){
-        console.log(httResponse.data)
-        authSection.classList.add("hidden")
-        dashboard.classList.remove("hidden")
+            console.log(httResponse.data)
+            authSection.classList.add("hidden")
+            dashboard.classList.remove("hidden")
+            spanIniziale.textContent = httResponse.data.nome[0].toUpperCase()
         }
-    else
-        alert(httResponse.status + " : " + httResponse.err)
+        else{
+            if(httResponse.status == 401)
+                msgErroreLogin.classList.remove("hidden")
+            else
+                alert(httResponse.status + " : " + httResponse.err)
+        }
 }
 
 async function handleSignup(event){
@@ -494,12 +494,17 @@ async function handleSignup(event){
         "email":signupEmail.value
     })
         if(httResponse.status == 200){
-        console.log(httResponse.data)
-        authSection.classList.add("hidden")
-        dashboard.classList.remove("hidden")
+            console.log(httResponse.data)
+            authSection.classList.add("hidden")
+            dashboard.classList.remove("hidden")
+            spanIniziale.textContent = httResponse.data.nome[0].toUpperCase()
         }
-    else
-        alert(httResponse.status + " : " + httResponse.err)
+        else{
+            if(httResponse.status == 400)
+                msgErroreRegistrazione.classList.remove("hidden")
+            else
+                alert(httResponse.status + " : " + httResponse.err)
+        }
 }
 
 // ============================================
@@ -1049,7 +1054,7 @@ function closeCardModal() {
 if (newUploadBtn) {
   newUploadBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    fileInput.click();
+    fileInputCore.click();
   });
 }
 
@@ -1187,6 +1192,202 @@ function scaricaTutto() {
     doc.save(filename);
     
     console.log('✅ PDF generato:', filename);
+}
+
+// ============================================
+// ONBOARDING - SMART FLOW
+// ============================================
+
+// ============================================
+// STEP 0: FILE UPLOAD
+// ============================================
+
+const pasteContent = document.getElementById('pasteContent');
+
+// Character counter
+if (pasteContent) {
+    pasteContent.addEventListener('input', function() {
+        const count = this.value.length;
+        document.getElementById('charCount').textContent = `${count} caratteri`;
+    });
+}
+
+// Drag and drop
+if (dropZoneCoreSection) {
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+    });
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZoneCoreSection.addEventListener(eventName, () => {
+            dropZoneCoreSection.classList.add('border-indigo-500', 'bg-indigo-50');
+        });
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZoneCoreSection.addEventListener(eventName, () => {
+            dropZoneCoreSection.classList.remove('border-indigo-500', 'bg-indigo-50');
+        });
+    });
+
+    dropZoneCoreSection.addEventListener('drop', (e) => {
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            handleFileUpload(files[0]);
+        }
+    });
+
+    dropZoneCoreSection.addEventListener('click', () => {
+        fileInputCore.click();
+    });
+
+    fileInputCore.addEventListener('change', function() {
+        if (this.files.length > 0) {
+            handleFileUpload(this.files[0]);
+        }
+    });
+}
+
+// Analyze pasted text
+function analyzeText() {
+    const text = pasteContent.value.trim();
+    
+    if (text.length < 100) {
+        alert('Inserisci almeno 100 caratteri per un\'analisi accurata.');
+        return;
+    }
+    processContent('text', text);
+}
+
+// Handle file upload
+function handleFileUpload(file) {
+    // Validate
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+    if (!allowedTypes.includes(file.type)) {
+        alert('Tipo file non supportato. Usa PDF, JPG o PNG.');
+        return;
+    }
+    
+    if (file.size > 10 * 1024 * 1024) {
+        alert('File troppo grande. Massimo 10MB.');
+        return;
+    }
+    processContent('file', file);
+}
+
+// ============================================
+// PROCESSING
+// ============================================
+
+async function processContent(type, content) {
+    // Hide step 0, show processing
+    document.getElementById('step0').classList.add('hidden');
+    document.getElementById('processingStep').classList.remove('hidden');
+    
+    const statusEl = document.getElementById('processingStatus');
+    const progressEl = document.getElementById('processingProgress');
+    const percentageEl = document.getElementById('processingPercentage');
+    const updatesEl = document.getElementById('processingUpdates');
+    
+    try {
+        let response;
+        
+        if (type === 'file') {
+            const formData = new FormData();
+            formData.append('file', content);
+            
+            response = await fetch('/api/upload', {
+                method: 'POST',
+                body: formData
+            });
+        } else {
+            // Text paste
+            response = await fetch('/api/analyze-text', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: content })
+            });
+        }
+        
+        if (!response.ok) throw new Error('Processing failed');
+        
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+            
+            for (const line of lines) {
+                if (!line.trim() || !line.startsWith('data: ')) continue;
+                
+                try {
+                    const data = JSON.parse(line.slice(6));
+                    
+                    // Update progress
+                    if (data.pct !== undefined) {
+                        progressEl.style.width = data.pct + '%';
+                        percentageEl.textContent = data.pct + '%';
+                    }
+                    
+                    if (data.msg) {
+                        statusEl.textContent = data.msg;
+                        
+                        // Add to live updates
+                        const update = document.createElement('div');
+                        update.className = 'flex items-center gap-3 p-3 bg-gray-50 rounded-lg animate-fade-in';
+                        update.innerHTML = `
+                            <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span class="text-sm text-gray-700">${data.msg}</span>
+                        `;
+                        updatesEl.appendChild(update);
+                    }
+                    
+                    if (data.error) {
+                        throw new Error(data.error);
+                    }
+                    
+                    if (data.done) {
+                        // Save data
+                        if (data.flashcard) {
+                            const flashcards = JSON.parse(data.flashcard);
+                        }
+                        
+                        if (data.quiz) {
+                            const quizzes = JSON.parse(data.quiz);
+                        }
+                        
+                        if (data.extractedText) {
+
+                        }
+                        processingStep.classList.add("hidden")
+                        questionario.classList.remove("hidden")
+                    }
+                    
+                } catch (e) {
+                    console.error('Parse error:', e);
+                }
+            }
+        }
+        
+    } catch (error) {
+        console.error('Processing error:', error);
+        alert('Errore durante l\'analisi: ' + error.message);
+        
+        // Reset
+        document.getElementById('processingStep').classList.add('hidden');
+        document.getElementById('step0').classList.remove('hidden');
+    }
 }
 
 // ============================================

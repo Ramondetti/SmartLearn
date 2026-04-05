@@ -156,7 +156,7 @@ app.post("/api/login",async function(req,res,next){
                         const token = createToken(dbUser)
                         res.cookie("token",token,cookiesOption)
                         console.log("Cookie: ", res.getHeader("set-cookie"))
-                        res.send({"_id":dbUser._id})
+                        res.send({"_id":dbUser._id, "nome":dbUser.nome})
                     }
                 }
             })
@@ -220,7 +220,7 @@ app.post("/api/registrazione",async function(req,res,next){
         })
         res.cookie("token",token,cookiesOption)
         console.log("Cookie: ", res.getHeader("set-cookie"))
-        res.send(data)
+        res.send({"_id":data.insertedId, "nome":nome})
     })
 
     cmd.finally(function(){
