@@ -34,7 +34,7 @@
           <a href="#how-it-works" class="text-gray-700 hover:text-indigo-600 transition font-medium">Come Funziona</a>
           <a href="#roadmap" class="text-gray-700 hover:text-indigo-600 transition font-medium">Roadmap</a>
           <button id="showSectionStartNav" class="hover:cursor-pointer bg-linear-to-r from-indigo-600 to-purple-600 text-white px-6 py-2 rounded-full hover:shadow-lg hover:scale-105 transition transform font-semibold">
-            Inizia Gratis →
+            Accedi →
           </button>
         </div>
         <!-- Mobile Menu Button -->
@@ -130,7 +130,7 @@
             <!-- Hidden File Input -->
             <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png" class="hidden"/>
             <div class="text-6xl mb-4 group-hover:scale-110 transition-transform duration-300">📄</div>
-            <p class="text-gray-700 font-semibold text-lg mb-2">Trascina i tuoi appunti qui</p>
+            <p class="text-gray-700 font-semibold text-lg mb-2">Trascina i tuoi appunti qui per un'anteprima</p>
             <p class="text-sm text-gray-500">PDF, JPG, PNG supportati • Max 10MB</p>
             <!-- Button che apre file selector -->
             <button 
@@ -145,7 +145,7 @@
           <div class="grid grid-cols-3 gap-3">
             <div class="bg-blue-50 rounded-lg p-3 text-center">
               <div class="text-2xl mb-1">⚡</div>
-              <p class="text-xs font-semibold text-gray-700">30 sec</p>
+              <p class="text-xs font-semibold text-gray-700">60 sec</p>
             </div>
             <div class="bg-purple-50 rounded-lg p-3 text-center">
               <div class="text-2xl mb-1">🤖</div>
@@ -344,7 +344,7 @@
   <!-- ============================================ -->
   <!-- ROADMAP -->
   <!-- ============================================ -->
-  <section id="roadmap" class="hidden py-20 bg-gray-50">
+  <section id="roadmap" class="py-20 bg-gray-50">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       
       <!-- Section Header -->
@@ -623,7 +623,7 @@
                                     <span class="px-4 py-2 bg-white rounded-full shadow-sm border border-gray-200 text-sm font-semibold text-gray-700">🖼️ PNG</span>
                                 </div>
 
-                                <button type="button" onclick="document.getElementById('fileInputCore').click()" class="px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold rounded-full shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all">
+                                <button type="button" class="hover:cursor-pointer px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold rounded-full shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all">
                                     Seleziona File
                                 </button>
                             </div>
@@ -1006,23 +1006,12 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
                     </svg>
                 </div>
-                <h2 class="text-2xl font-bold text-gray-900 mb-1">Benvenuto su SmartLearn</h2>
-                <p class="text-sm text-gray-600">Crea un account o accedi per continuare</p>
+                <h2 class="text-2xl font-bold text-gray-900 mb-1">Bentornato su SmartLearn</h2>
+                <p class="text-sm text-gray-600">Accedi per continuare</p>
             </div>
 
             <!-- Main Card -->
             <div class="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 overflow-hidden">
-                
-                <!-- Tab Switcher -->
-                <div class="flex gap-1 p-1 bg-gray-50/50">
-                    <button id="loginTab" class="hover:cursor-pointer flex-1 py-2.5 px-4 rounded-2xl font-medium text-sm transition-all bg-white text-indigo-600 shadow-md">
-                        Accedi
-                    </button>
-                    <button id="signupTab" class="hover:cursor-pointer flex-1 py-2.5 px-4 rounded-2xl font-medium text-sm transition-all text-gray-600 hover:text-gray-900 hover:bg-white/50">
-                        Registrati
-                    </button>
-                </div>
-
                 <!-- Forms Container -->
                 <div class="p-6">
                     <!-- LOGIN FORM -->
@@ -1168,16 +1157,7 @@
                             </svg>
                             <span class="text-sm font-medium text-gray-700 group-hover:text-gray-900">Continua con Google</span>
                         </button>
-
-                        <!-- Guest Mode -->
-                        <button onclick="continueAsGuest()" class="hover:cursor-pointer w-full flex items-center justify-center gap-2.5 px-4 py-2.5 border-2 border-dashed border-gray-200 rounded-xl hover:bg-indigo-50 hover:border-indigo-300 transition-all group">
-                            <svg class="w-4 h-4 text-gray-400 group-hover:text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                            </svg>
-                            <span class="text-sm font-medium text-gray-500 group-hover:text-indigo-700">Continua come Ospite</span>
-                        </button>
                     </div>
-
                 </div>
             </div>
         </div>
@@ -1786,9 +1766,429 @@
     </div>
 </section>
 <!-- ============================================ -->
-<!-- SMARTLEARN DASHBOARD - STUDY OS -->
+<!-- RESULTS PAGE - WOW MOMENT -->
 <!-- ============================================ -->
 
+<section id="resultsPage" class="hidden min-h-screen bg-linear-to-br from-indigo-50 via-purple-50 to-pink-50 relative overflow-hidden"> 
+    <!-- Animated Background -->
+    <div class="absolute inset-0 overflow-hidden pointer-events-none">
+        <div class="absolute -top-40 -right-40 w-96 h-96 bg-linear-to-br from-indigo-400 to-purple-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
+        <div class="absolute -bottom-40 -left-40 w-96 h-96 bg-linear-to-br from-purple-400 to-pink-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
+        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-linear-to-br from-pink-400 to-indigo-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000"></div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="relative z-10 min-h-screen p-4 sm:p-6 lg:p-8">
+        <div class="max-w-7xl mx-auto">
+
+            <!-- ============================================ -->
+            <!-- SUCCESS HEADER -->
+            <!-- ============================================ -->
+            <div class="text-center mb-12 animate-fade-in">
+                <!-- Success Animation -->
+                <div class="inline-flex items-center justify-center w-20 h-20 bg-linear-to-br from-green-500 to-emerald-600 rounded-full mb-6 shadow-2xl animate-scale-in">
+                    <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                </div>
+
+                <h1 class="text-4xl sm:text-5xl font-extrabold text-gray-900 mb-3">
+                    Analisi Completata! 🎉
+                </h1>
+                <p class="text-xl text-gray-600 mb-2">
+                    Ho analizzato <span id="documentName" class="font-bold text-indigo-600" id="materialName"></span>
+                </p>
+                <p class="text-gray-500">
+                    Ecco tutto quello che ho preparato per te
+                </p>
+            </div>
+
+            <!-- ============================================ -->
+            <!-- MAIN GRID: 3 COLUMNS -->
+            <!-- ============================================ -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+
+                <!-- ============================================ -->
+                <!-- LEFT: DIAGNOSI & PIANO -->
+                <!-- ============================================ -->
+                <div class="lg:col-span-2 space-y-6">
+
+                    <!-- DIAGNOSIS CARD -->
+                    <div class="bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 p-8 animate-slide-up">
+                        <div class="flex items-center gap-3 mb-6">
+                            <div class="w-12 h-12 bg-linear-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <h2 class="text-2xl font-bold text-gray-900">📊 Diagnosi Automatica</h2>
+                                <p class="text-sm text-gray-600">Basata sull'analisi AI del materiale</p>
+                            </div>
+                        </div>
+
+                        <!-- Stats Grid -->
+                        <div class="grid grid-cols-2 gap-4 mb-6">
+                            <!-- Argomenti -->
+                            <div class="bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl p-5 border-2 border-purple-200">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="text-2xl">📚</span>
+                                    <span class="text-sm font-semibold text-purple-800">Argomenti</span>
+                                </div>
+                                <p class="text-3xl font-bold text-purple-900 mb-1" id="topicCount">5</p>
+                                <p class="text-xs text-purple-700" id="topicsList">Probabilità base, Variabili aleatorie, Distribuzioni...</p>
+                            </div>
+
+                            <!-- Difficoltà -->
+                            <div class="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-2xl p-5 border-2 border-yellow-200">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="text-2xl">⚡</span>
+                                    <span class="text-sm font-semibold text-yellow-800">Difficoltà</span>
+                                </div>
+                                <p class="text-3xl font-bold text-yellow-900 mb-1" id="difficulty">Intermedia</p>
+                                <p class="text-xs text-yellow-700">Richiede basi di matematica</p>
+                            </div>
+
+                            <!-- Tempo Necessario -->
+                            <div class="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-2xl p-5 border-2 border-indigo-200">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="text-2xl">⏱️</span>
+                                    <span class="text-sm font-semibold text-indigo-800">Tempo Stimato</span>
+                                </div>
+                                <p class="text-3xl font-bold text-indigo-900 mb-1" id="estimatedTime">~6 ore</p>
+                                <p class="text-xs text-indigo-700">Per padronanza completa</p>
+                            </div>
+
+                            <!-- Materiale Generato -->
+                            <div class="bg-gradient-to-br from-green-50 to-green-100 rounded-2xl p-5 border-2 border-green-200">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="text-2xl">✨</span>
+                                    <span class="text-sm font-semibold text-green-800">Generato</span>
+                                </div>
+                                <p class="text-3xl font-bold text-green-900 mb-1" id="generatedCount">57</p>
+                                <p class="text-xs text-green-700"><span id="flashcardCount">45</span> flashcard + <span id="quizCount">12</span> quiz</p>
+                            </div>
+                        </div>
+
+                        <!-- Risk Assessment -->
+                        <div class="p-4 bg-gradient-to-r from-orange-50 to-red-50 border-l-4 border-orange-500 rounded-lg">
+                            <div class="flex items-start gap-3">
+                                <svg class="w-5 h-5 text-orange-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                </svg>
+                                <div class="flex-1">
+                                    <p class="text-sm font-bold text-orange-900 mb-1">Valutazione Rischio: <span id="riskLevel">Medio</span></p>
+                                    <p class="text-sm text-orange-800" id="riskMessage">Argomenti complessi rilevati. Sistema consiglia: studio distribuito con ripetizione distanziata.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- STUDY PLAN CARD -->
+                    <div class="bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 p-8 animate-slide-up animation-delay-200">
+                        <div class="flex items-center justify-between mb-6">
+                            <div class="flex items-center gap-3">
+                                <div class="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
+                                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h2 class="text-2xl font-bold text-gray-900">📅 Il Tuo Piano di Studio</h2>
+                                    <p class="text-sm text-gray-600">Personalizzato in base alle tue risposte</p>
+                                </div>
+                            </div>
+                            <button class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-semibold transition-colors">
+                                Modifica
+                            </button>
+                        </div>
+
+                        <!-- Strategy Badge -->
+                        <div class="mb-6 p-4 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border border-indigo-200">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 bg-indigo-500 rounded-lg flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p class="text-xs font-semibold text-indigo-600 uppercase">Strategia Consigliata</p>
+                                    <p class="text-sm font-bold text-gray-900" id="strategy">Spaced Repetition + Quiz Mirati</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Timeline -->
+                        <div class="space-y-4" id="studyPlanTimeline">
+                            <!-- Day 1 - Active -->
+                            <div class="relative pl-8 pb-8 border-l-2 border-indigo-500">
+                                <div class="absolute -left-[9px] top-0 w-4 h-4 bg-indigo-500 rounded-full border-4 border-white"></div>
+                                <div class="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-4 border-2 border-indigo-200">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-xs font-bold text-indigo-600 uppercase">Oggi</span>
+                                            <span class="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-bold">Priorità Alta</span>
+                                        </div>
+                                        <span class="text-xs text-gray-500">15 minuti</span>
+                                    </div>
+                                    <h3 class="font-bold text-gray-900 mb-1">Fondamenta: Definizioni Base</h3>
+                                    <p class="text-sm text-gray-700 mb-3">Quiz su concetti fondamentali di probabilità. Costruisci le basi solide.</p>
+                                    <div class="flex items-center gap-2 text-xs text-gray-600">
+                                        <span>📝 10 quiz</span>
+                                        <span>•</span>
+                                        <span>⚡ Difficoltà: Facile</span>
+                                        <span>•</span>
+                                        <span class="text-green-600 font-semibold">85% successo stimato</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Day 2 -->
+                            <div class="relative pl-8 pb-8 border-l-2 border-gray-300">
+                                <div class="absolute -left-[9px] top-0 w-4 h-4 bg-gray-300 rounded-full border-4 border-white"></div>
+                                <div class="bg-white rounded-xl p-4 border border-gray-200 hover:border-purple-300 transition-all">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <span class="text-xs font-bold text-gray-500 uppercase">Domani</span>
+                                        <span class="text-xs text-gray-500">20 minuti</span>
+                                    </div>
+                                    <h3 class="font-semibold text-gray-900 mb-1">Probabilità Condizionata</h3>
+                                    <p class="text-sm text-gray-600 mb-3">Flashcard + quiz su probabilità condizionata e teorema di Bayes.</p>
+                                    <div class="flex items-center gap-2 text-xs text-gray-500">
+                                        <span>📚 15 flashcard</span>
+                                        <span>•</span>
+                                        <span>📝 5 quiz</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Day 3 -->
+                            <div class="relative pl-8 pb-8 border-l-2 border-gray-300">
+                                <div class="absolute -left-[9px] top-0 w-4 h-4 bg-gray-300 rounded-full border-4 border-white"></div>
+                                <div class="bg-white rounded-xl p-4 border border-gray-200 hover:border-purple-300 transition-all">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <span class="text-xs font-bold text-gray-500 uppercase">Tra 2 giorni</span>
+                                        <span class="text-xs text-gray-500">30 minuti</span>
+                                    </div>
+                                    <h3 class="font-semibold text-gray-900 mb-1">Variabili Aleatorie</h3>
+                                    <p class="text-sm text-gray-600 mb-3">Sessione mista: teoria + esercizi su variabili discrete e continue.</p>
+                                    <div class="flex items-center gap-2 text-xs text-gray-500">
+                                        <span>📚 12 flashcard</span>
+                                        <span>•</span>
+                                        <span>📝 8 quiz</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Final Exam -->
+                            <div class="relative pl-8">
+                                <div class="absolute -left-[9px] top-0 w-4 h-4 bg-orange-400 rounded-full border-4 border-white"></div>
+                                <div class="bg-gradient-to-r from-orange-50 to-red-50 rounded-xl p-4 border-2 border-orange-200">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-xs font-bold text-orange-600 uppercase">Tra 7 giorni</span>
+                                            <span class="px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-xs font-bold">🎓 Simulazione</span>
+                                        </div>
+                                        <span class="text-xs text-gray-600">45 minuti</span>
+                                    </div>
+                                    <h3 class="font-bold text-gray-900 mb-1">Esame Simulato Completo</h3>
+                                    <p class="text-sm text-gray-700 mb-3">Test finale con domande su tutti gli argomenti. Tempo reale, feedback immediato.</p>
+                                    <div class="flex items-center gap-2 text-xs text-gray-600">
+                                        <span>📝 25 domande miste</span>
+                                        <span>•</span>
+                                        <span>⏱️ Condizioni d'esame</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- NEXT ACTION - BIG CTA -->
+                    <div class="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-3xl shadow-2xl p-8 text-white animate-slide-up animation-delay-400">
+                        <div class="flex items-start justify-between gap-6">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2 mb-4">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                    </svg>
+                                    <h2 class="text-2xl font-bold">⚡ La Tua Prossima Azione</h2>
+                                </div>
+
+                                <div class="bg-white/20 backdrop-blur-sm rounded-2xl p-6 border border-white/30 mb-6">
+                                    <h3 class="text-xl font-bold mb-2">Quiz: Definizioni Base di Probabilità</h3>
+                                    <p class="text-white/90 text-sm mb-4">
+                                        Partiremo dai concetti fondamentali. Questo ti darà le basi per capire tutti gli altri argomenti.
+                                    </p>
+                                    <div class="flex items-center gap-4 text-sm">
+                                        <div class="flex items-center gap-2">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                            </svg>
+                                            <span>15 minuti</span>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                                            </svg>
+                                            <span>10 domande</span>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                            </svg>
+                                            <span>Difficoltà: Facile</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <button onclick="startStudying()" class="w-full px-8 py-5 bg-white text-indigo-600 rounded-2xl font-bold text-lg shadow-xl hover:shadow-2xl transform hover:-translate-y-1 transition-all">
+                                    Inizia Subito →
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- ============================================ -->
+                <!-- RIGHT SIDEBAR: QUICK ACCESS -->
+                <!-- ============================================ -->
+                <div class="space-y-6">
+
+                    <!-- GENERATED CONTENT PREVIEW -->
+                    <div class="bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 p-6 animate-slide-right">
+                        <h3 class="text-lg font-bold text-gray-900 mb-4">📦 Materiale Generato</h3>
+
+                        <!-- Flashcards -->
+                        <div class="mb-4 p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border-2 border-blue-200 hover:shadow-lg transition-shadow cursor-pointer group">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-2xl">📚</span>
+                                    <span class="font-bold text-gray-900">Flashcard</span>
+                                </div>
+                                <span class="text-2xl font-bold text-blue-600" id="sideFlashcardCount">45</span>
+                            </div>
+                            <p class="text-sm text-gray-700 mb-3">Domande e risposte per ripassare velocemente</p>
+                            <button onclick="showFlashcards()" class="hover:cursor-pointer w-full px-4 py-2 bg-blue-500 text-white rounded-lg font-semibold text-sm hover:bg-blue-600 transition-colors">
+                                Visualizza →
+                            </button>
+                        </div>
+
+                        <!-- Quizzes -->
+                        <div class="mb-4 p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-xl border-2 border-green-200 hover:shadow-lg transition-shadow cursor-pointer group">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-2xl">❓</span>
+                                    <span class="font-bold text-gray-900">Quiz</span>
+                                </div>
+                                <span class="text-2xl font-bold text-green-600" id="sideQuizCount">12</span>
+                            </div>
+                            <p class="text-sm text-gray-700 mb-3">Test a risposta multipla per verificare la comprensione</p>
+                            <button onclick="showQuizzes()" class="hover>:cursor-pointer w-full px-4 py-2 bg-green-500 text-white rounded-lg font-semibold text-sm hover:bg-green-600 transition-colors">
+                                Inizia Quiz →
+                            </button>
+                        </div>
+
+                        <!-- AI Tutor -->
+                        <div class="p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl border-2 border-purple-200 hover:shadow-lg transition-shadow cursor-pointer group">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-2xl">💬</span>
+                                    <span class="font-bold text-gray-900">AI Tutor</span>
+                                </div>
+                                <span class="px-2 py-1 bg-purple-200 text-purple-800 rounded-full text-xs font-bold">Nuovo</span>
+                            </div>
+                            <p class="text-sm text-gray-700 mb-3">Fai domande sul materiale, ricevi spiegazioni personalizzate</p>
+                            <button onclick="openAITutor()" class="hover:cursor-pointer w-full px-4 py-2 bg-purple-500 text-white rounded-lg font-semibold text-sm hover:bg-purple-600 transition-colors">
+                                Apri Chat →
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- GUEST MODE REMINDER -->
+                    <div class="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-2xl border-2 border-yellow-300 p-6 shadow-lg animate-slide-right animation-delay-200">
+                        <div class="flex items-start gap-3 mb-4">
+                            <div class="w-10 h-10 bg-yellow-400 rounded-lg flex items-center justify-center shrink-0">
+                                <svg class="w-5 h-5 text-yellow-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                </svg>
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="font-bold text-gray-900 mb-2">💾 Modalità Ospite</h3>
+                                <p class="text-sm text-gray-700 mb-4">
+                                    Stai usando SmartLearn senza account. Se chiudi la pagina, perderai tutti i progressi.
+                                </p>
+                                <button onclick="showSignup()" class="w-full px-4 py-3 bg-yellow-500 text-white rounded-lg font-bold text-sm hover:bg-yellow-600 transition-colors shadow-lg">
+                                    Salva i Progressi →
+                                </button>
+                                <button onclick="continueAsGuest()" class="w-full mt-2 px-4 py-2 bg-transparent border-2 border-yellow-400 text-gray-700 rounded-lg font-semibold text-sm hover:bg-yellow-50 transition-colors">
+                                    Continua Senza Salvare
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- QUICK STATS -->
+                    <div class="bg-white/90 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 p-6 animate-slide-right animation-delay-400">
+                        <h3 class="text-lg font-bold text-gray-900 mb-4">⚡ Statistiche Rapide</h3>
+
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                <span class="text-sm text-gray-700">Pagine analizzate</span>
+                                <span class="font-bold text-gray-900" id="pagesAnalyzed">47</span>
+                            </div>
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                <span class="text-sm text-gray-700">Parole chiave</span>
+                                <span class="font-bold text-gray-900" id="keywords">156</span>
+                            </div>
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                <span class="text-sm text-gray-700">Sessioni previste</span>
+                                <span class="font-bold text-gray-900" id="sessions">8-12</span>
+                            </div>
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                <span class="text-sm text-gray-700">Completamento</span>
+                                <span class="font-bold text-indigo-600" id="completion">7-10 giorni</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ACTIONS -->
+                    <div class="bg-white/90 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 p-6 animate-slide-right animation-delay-600">
+                        <h3 class="text-lg font-bold text-gray-900 mb-4">🎯 Azioni Rapide</h3>
+
+                        <div class="space-y-2">
+                            <button onclick="goToDashboard()" class="w-full px-4 py-3 bg-indigo-600 text-white rounded-lg font-semibold text-sm hover:bg-indigo-700 transition-colors flex items-center justify-between group">
+                                <span>Vai alla Dashboard</span>
+                                <svg class="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                </svg>
+                            </button>
+
+                            <button onclick="downloadPDF()" class="w-full px-4 py-3 bg-gray-100 text-gray-700 rounded-lg font-semibold text-sm hover:bg-gray-200 transition-colors flex items-center justify-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                                <span>Scarica Piano PDF</span>
+                            </button>
+
+                            <button onclick="shareResults()" class="w-full px-4 py-3 bg-gray-100 text-gray-700 rounded-lg font-semibold text-sm hover:bg-gray-200 transition-colors flex items-center justify-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"></path>
+                                </svg>
+                                <span>Condividi</span>
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+</section>
+<!-- ============================================ -->
+<!-- SMARTLEARN DASHBOARD -->
+<!-- ============================================ -->
 <section id="dashboard" class="hidden min-h-screen bg-linear-to-br from-gray-50 to-indigo-50/30">  
     <!-- Top Navigation -->
     <nav class="bg-white border-b border-gray-200 sticky top-0 z-50 backdrop-blur-lg bg-white/95">
@@ -2346,7 +2746,5 @@
 
     </div>
 </section>
-
-
 </body>
 </html>

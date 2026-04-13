@@ -397,7 +397,7 @@ backToResultsFromAI.addEventListener("click", function() {
 
 showSectionStartNav.addEventListener("click",function(){
     homepage.classList.add("hidden")
-    onboardingSection.classList.remove("hidden")
+    authSection.classList.remove("hidden")
 })
 
 showSectionStartMobile.addEventListener("click",function(){
@@ -438,18 +438,6 @@ showHidePsw.addEventListener("click",function(){
     }
 })
 
-loginTab.addEventListener("click",function(){
-   loginForm.classList.remove("hidden")
-   signupForm.classList.add("hidden")
-   cambiaGraficaBottone(loginTab)
-})
-
-signupTab.addEventListener("click",function(){
-   loginForm.classList.add("hidden")
-   signupForm.classList.remove("hidden")
-   cambiaGraficaBottone(signupTab)
-})
-
 showHidePswSignup.addEventListener("click",function(){
     if(signupPassword.type == "password"){
     eyeShowPswSignUp.classList.add("hidden")
@@ -462,14 +450,6 @@ else{
     signupPassword.type = "password"
 }
 })
-
-function cambiaGraficaBottone(button){
-    button.classList.add("text-indigo-600","shadow-md","bg-white")
-    button.classList.remove("hover:text-gray-900","text-gray-600","hover:bg-white/50")
-    const nearButton = button.nextElementSibling || button.previousElementSibling
-    nearButton.classList.remove("text-indigo-600","shadow-md","bg-white")
-    nearButton.classList.add("text-gray-600","hover:text-gray-900")    
-}
 
 async function handleLogin(event){
     event.preventDefault()
@@ -1298,8 +1278,9 @@ async function processContent(type, content) {
         if (type === 'file') {
             const formData = new FormData();
             formData.append('file', content);
+            documentoCorrente = formData
             
-            response = await fetch('/api/upload', {
+            response = await fetch('/api/create-ai-plane', {
                 method: 'POST',
                 body: formData
             });
@@ -1371,7 +1352,12 @@ async function processContent(type, content) {
 
                         }
                         processingStep.classList.add("hidden")
-                        questionario.classList.remove("hidden")
+                        onboardingSection.classList.add("hidden")
+                        resultsPage.classList.remove("hidden")
+                        console.log(data)
+                        documentName.textContent = documentoCorrente.get("file").name
+                        sideFlashcardCount.textContent = flashcards.length
+                        sideQuizCount.textContent = quizzes.length
                     }
                     
                 } catch (e) {
@@ -1510,4 +1496,65 @@ function completeOnboarding() {
     console.log('✅ Onboarding completato:', onboardingData)
     onboardingSection.classList.add("hidden")
     authSection.classList.remove("hidden")
+}
+
+// ============================================
+// RESULTS PAGE FUNCTIONS
+// ============================================
+
+function startStudying() {
+    // Nascondi results, mostra dashboard
+    document.getElementById('resultsPage').classList.add('hidden');
+    document.getElementById('dashboard').classList.remove('hidden');
+    
+    // Trigger first session
+    startNextAction();
+}
+
+function showFlashcards() {
+    const flashcards = JSON.parse(localStorage.getItem('flashcards') || '[]');
+    // Open flashcard viewer modal
+    console.log('Show', flashcards.length, 'flashcards');
+}
+
+function showQuizzes() {
+    const quizzes = JSON.parse(localStorage.getItem('quizzes') || '[]');
+    // Open quiz session
+    console.log('Start quiz with', quizzes.length, 'questions');
+}
+
+function openAITutor() {
+    // Open AI chat modal
+    console.log('Open AI Tutor');
+}
+
+function goToDashboard() {
+    document.getElementById('resultsPage').classList.add('hidden');
+    document.getElementById('dashboard').classList.remove('hidden');
+}
+
+function downloadPDF() {
+    // Generate PDF with study plan
+    console.log('Download study plan PDF');
+}
+
+function shareResults() {
+    // Share functionality
+    if (navigator.share) {
+        navigator.share({
+            title: 'Il mio Piano di Studio SmartLearn',
+            text: 'Ho creato un piano di studio personalizzato per Probabilità!',
+            url: window.location.href
+        });
+    }
+}
+
+function showSignup() {
+    // Show signup modal
+    console.log('Show signup modal');
+}
+
+function continueAsGuest() {
+    // Just continue to dashboard
+    goToDashboard();
 }

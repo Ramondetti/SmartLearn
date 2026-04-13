@@ -284,7 +284,7 @@ app.post("/api/upload", upload.single("file"), async function(req, res) {
                 throw new Error('Testo estratto insufficiente. Assicurati che il documento contenga testo leggibile.');
             }
             
-            sendEvent(1, 35, "Testo estratto con successo ✓");
+            sendEvent(1, 35, "Testo estratto con successo");
             console.log('✅ Extracted text:', extractedTextFromPdf.length, 'chars');
             
         } catch (extractError: any) {
@@ -456,7 +456,7 @@ app.post("/api/upload", upload.single("file"), async function(req, res) {
             } catch {}
         }
     }
-});
+})
 
 app.post("/api/chat", async function(req, res) {
     const prompt = req.body.message || req.body.prompt
@@ -519,7 +519,308 @@ app.post("/api/chat", async function(req, res) {
             error: 'Errore nella generazione della risposta'
         });
     }
-});
+})
+
+app.post("/api/create-ai-plane", upload.single("file"), async function(req, res) {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders();
+
+    const sendEvent = (step: number, pct: number, msg: string) => {
+        res.write(`data: ${JSON.stringify({ step, pct, msg })}\n\n`);
+    };
+
+    let responseEnded = false;
+    
+    const safeEnd = () => {
+        if (!responseEnded) {
+            res.end();
+            responseEnded = true;
+        }
+    };
+    
+    const safeWrite = (data: string) => {
+        if (!responseEnded) {
+            res.write(data);
+        }
+    };
+
+    try {
+        const filePath: any = req.file?.path;
+        const mimeType = req.file?.mimetype;
+
+        const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+        if (!allowedTypes.includes(mimeType!)) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            await fs.promises.unlink(filePath);
+            
+            safeWrite(`data: ${JSON.stringify({ error: "Tipo file non supportato. Usa PDF, JPG o PNG" })}\n\n`);
+            return safeEnd();
+        }
+
+        sendEvent(1, 10, "Lettura del file...");
+
+        let extractedTextFromPdf: string;
+        
+        try {
+            if (mimeType!.startsWith('image/')) {
+                sendEvent(1, 15, "🔍 Riconoscimento testo con OCR...");
+            } else {
+                sendEvent(1, 15, "Estrazione testo in corso...");
+            }
+            
+            extractedTextFromPdf = await extractText(filePath, mimeType!);
+            
+            if (!extractedTextFromPdf || extractedTextFromPdf.length < 50) {
+                throw new Error('Testo estratto insufficiente. Assicurati che il documento contenga testo leggibile.');
+            }
+            
+            sendEvent(1, 35, "Testo estratto con successo");
+            console.log('✅ Extracted text:', extractedTextFromPdf.length, 'chars');
+            
+        } catch (extractError: any) {
+            console.error('❌ Text extraction failed:', extractError);
+            
+            await new Promise(resolve => setTimeout(resolve, 500));
+            try {
+                await fs.promises.unlink(filePath);
+            } catch {}
+            
+            safeWrite(`data: ${JSON.stringify({ 
+                error: extractError.message || 'Estrazione testo fallita'
+            })}\n\n`);
+            return safeEnd();
+        }
+
+        const MAX_CHARS = 70000;
+        const chunks: string[] = [];
+        
+        for (let i = 0; i < extractedTextFromPdf.length; i += MAX_CHARS) {
+            chunks.push(extractedTextFromPdf.substring(i, i + MAX_CHARS));
+        }
+
+        console.log('📚 Processing', chunks.length, 'chunks...');
+        sendEvent(2, 40, "Generazione flashcard e quiz...");
+
+        // ✅ GENERAZIONE CON RETRY
+        const flashcardPromises = chunks.map(async (chunk, index) => {
+            const promptFlashcard = `Sei un assistente educativo. Analizza il testo e genera flashcard di studio.
+                TESTO:
+                """
+                ${chunk.substring(0, 60000)}
+                """
+
+                ISTRUZIONI CRITICHE:
+                1. Genera quante più flashcard possibili che abbiano senso ma massimo 20
+                2. Ogni domanda deve essere chiara e specifica
+                3. Ogni risposta deve essere accurata e completa
+                4. Usa SOLO questo formato JSON (niente testo extra, niente markdown):
+
+                [
+                {"front": "Prima domanda?", "back": "Prima risposta dettagliata"},
+                {"front": "Seconda domanda?", "back": "Seconda risposta dettagliata"},
+                {"front": "Terza domanda?", "back": "Terza risposta dettagliata"},
+                {"front": "Quarta domanda?", "back": "Quarta risposta dettagliata"},
+                {"front": "Quinta domanda?", "back": "Quinta risposta dettagliata"}
+                ]
+
+                IMPORTANTE: Rispondi SOLO con l'array JSON, nient'altro.`;
+
+            try {
+                const items = await generateWithRetry(promptFlashcard, 'flashcard');
+                console.log(`✅ Flashcard chunk ${index + 1}: ${items.length} valid`);
+                return items;
+            } catch (error: any) {
+                console.error(`❌ Flashcard chunk ${index + 1} failed:`, error.message);
+                return [];
+            }
+        });
+
+        const quizPromises = chunks.map(async (chunk, index) => {
+            const promptQuiz = `Sei un assistente educativo. Analizza il testo e genera quiz a risposta multipla.
+            TESTO:
+            """
+            ${chunk.substring(0, 60000)}
+            """
+
+            ISTRUZIONI CRITICHE:
+            1. Genera quanti più quiz possibili che abbiano senso
+            2. Ogni quiz deve avere 4 opzioni
+            3. Solo 1 risposta corretta per quiz
+            4. Usa SOLO questo formato JSON (niente testo extra, niente markdown):
+
+            [
+            {"question": "Prima domanda?", "options": ["Risposta A", "Risposta B", "Risposta C", "Risposta D"], "correct": 0},
+            {"question": "Seconda domanda?", "options": ["Risposta A", "Risposta B", "Risposta C", "Risposta D"], "correct": 1},
+            {"question": "Terza domanda?", "options": ["Risposta A", "Risposta B", "Risposta C", "Risposta D"], "correct": 2},
+            {"question": "Quarta domanda?", "options": ["Risposta A", "Risposta B", "Risposta C", "Risposta D"], "correct": 3},
+            {"question": "Quinta domanda?", "options": ["Risposta A", "Risposta B", "Risposta C", "Risposta D"], "correct": 0}
+            ]
+
+            IMPORTANTE:
+            - "correct" deve essere 0, 1, 2, o 3 (indice dell'opzione corretta)
+            - Rispondi SOLO con l'array JSON, nient'altro.`;
+
+            try {
+                const items = await generateWithRetry(promptQuiz, 'quiz');
+                console.log(`✅ Quiz chunk ${index + 1}: ${items.length} valid`);
+                return items;
+            } catch (error: any) {
+                console.error(`❌ Quiz chunk ${index + 1} failed:`, error.message);
+                return [];
+            }
+        });
+
+        sendEvent(2, 50, "Elaborazione in corso...");
+        
+        const [flashcardResults, quizResults] = await Promise.all([
+            Promise.all(flashcardPromises),
+            Promise.all(quizPromises)
+        ]);
+
+        const allFlashcards = flashcardResults.flat();
+        const allQuizzes = quizResults.flat();
+
+        sendEvent(3, 96, "Generazione piano di studio AI...");
+
+        let studyPlanData = null;
+
+        try {
+            const planPrompt = `
+            Sei un esperto tutor AI. Analizza il testo e genera una diagnosi completa + piano di studio personalizzato.
+            TESTO:
+            ${chunks}
+
+            OBIETTIVO:
+            Restituisci un JSON COMPLETO per popolare una dashboard di studio.
+
+            FORMATO JSON OBBLIGATORIO (NESSUN testo extra):
+
+            {
+            "documentName": "Nome del documento (breve)",
+            "topics": ["argomento1", "argomento2", "argomento3"],
+            "difficulty": "Facile | Intermedia | Difficile",
+            "difficultyReason": "breve spiegazione",
+            "estimatedTime": "es: 6 ore",
+            
+            "stats": {
+                "pagesAnalyzed": numero stimato,
+                "keywords": numero stimato,
+                "sessions": "es: 8-12",
+                "completion": "es: 7-10 giorni"
+            },
+
+            "risk": {
+                "level": "Basso | Medio | Alto",
+                "message": "spiegazione semplice del rischio"
+            }
+
+            REGOLE IMPORTANTI:
+            - Massimo 3-6 topic
+            - Piano realistico (non troppo lungo)
+            - Linguaggio semplice
+            - Coerente con il contenuto
+            - Rispondi SOLO con JSON valido`
+            
+            const planResult = await generateWithRetry(planPrompt, 'plan');
+            
+            studyPlanData = planResult;
+            
+            console.log('✅ Study plan generated');
+        } catch (error: any) {
+            console.error('❌ Study plan failed:', error.message);
+            
+            // fallback intelligente
+            studyPlanData = {
+                documentName: "Documento caricato",
+                topics: ["Argomento principale"],
+                difficulty: "Intermedia",
+                difficultyReason: "Contenuto standard",
+                estimatedTime: "4-6 ore",
+                stats: {
+                    pagesAnalyzed: 0,
+                    keywords: 0,
+                    sessions: "5-8",
+                    completion: "5 giorni"
+                },
+                risk: {
+                    level: "Medio",
+                    message: "Richiede studio costante"
+                },
+                strategy: "Studio progressivo",
+                studyPlan: []
+            };
+        }
+
+        // ✅ FALLBACK: Se poche flashcard/quiz, genera minimo garantito
+        if (allFlashcards.length < 3) {
+            console.warn('⚠️ Too few flashcards, generating fallback...');
+            sendEvent(2, 70, "Generazione flashcard aggiuntive...");
+            
+            const fallbackFlashcards = [
+                {
+                    front: "Qual è il tema principale del documento?",
+                    back: extractedTextFromPdf.substring(0, 200) + "..."
+                },
+                {
+                    front: "Quali sono i punti chiave trattati?",
+                    back: "Il documento tratta vari argomenti che richiedono studio approfondito."
+                },
+                {
+                    front: "Come posso approfondire questo argomento?",
+                    back: "Rileggi il documento e crea le tue note personali."
+                }
+            ];
+            
+            allFlashcards.push(...fallbackFlashcards);
+        }
+
+        sendEvent(2, 90, `Flashcard: ${allFlashcards.length} ✓`);
+        sendEvent(3, 95, `Quiz: ${allQuizzes.length} ✓`);
+
+        console.log('✅ Total flashcards:', allFlashcards.length);
+        console.log('✅ Total quizzes:', allQuizzes.length);
+
+        sendEvent(4, 100, "Tutto pronto! 🚀");
+        
+        safeWrite(`data: ${JSON.stringify({
+        done: true,
+        flashcard: JSON.stringify(allFlashcards),
+        quiz: JSON.stringify(allQuizzes),
+        plan: studyPlanData,
+        extractedText: extractedTextFromPdf
+    })}\n\n`);
+        
+        safeEnd();
+
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        try {
+            await fs.promises.unlink(filePath);
+            console.log('✅ Deleted original file');
+        } catch (err: any) {
+            console.warn('⚠️ Could not delete original file:', err.message);
+        }
+
+        console.log('✅ Upload completed successfully');
+
+    } catch (error: any) {
+        console.error("❌ Errore server:", error);
+        
+        if (!responseEnded) {
+            safeWrite(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+            safeEnd();
+        }
+        
+        if (req.file?.path) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            try {
+                await fs.promises.unlink(req.file.path);
+            } catch {}
+        }
+    }
+})
 
 
 
@@ -553,7 +854,7 @@ app.use("/api", function(req:any,res,next){
 // EXTRACT JSON - VERSIONE SUPER ROBUSTA
 // ============================================
 
-function extractJSON(text: string, type: 'flashcard' | 'quiz'): any[] {
+function extractJSON(text: string, type: string): any[] {
     console.log(`🔍 Extracting ${type} JSON...`);
     
     if (!text || typeof text !== 'string') {
@@ -630,7 +931,7 @@ function extractJSON(text: string, type: 'flashcard' | 'quiz'): any[] {
                         
                     case 5:
                         // Ricostruzione manuale
-                        current = manualJSONReconstruction(cleaned, type);
+                        current = manualJSONReconstruction(cleaned, "plan");
                         break;
                 }
                 
@@ -672,7 +973,7 @@ function extractJSON(text: string, type: 'flashcard' | 'quiz'): any[] {
 // MANUAL JSON RECONSTRUCTION
 // ============================================
 
-function manualJSONReconstruction(text: string, type: 'flashcard' | 'quiz'): string {
+function manualJSONReconstruction(text: string, type: string): string {
     console.log('🔧 Attempting manual JSON reconstruction...');
     
     try {
@@ -697,6 +998,10 @@ function manualJSONReconstruction(text: string, type: 'flashcard' | 'quiz'): str
             return JSON.stringify(items);
             
         } else {
+            if(type == "plan"){
+                return text
+            }
+            else{
             // Cerca pattern quiz
             const questionRegex = /"question"\s*:\s*"([^"]+)"/g;
             const optionsRegex = /"options"\s*:\s*\[([^\]]+)\]/g;
@@ -724,6 +1029,7 @@ function manualJSONReconstruction(text: string, type: 'flashcard' | 'quiz'): str
             }
             
             return JSON.stringify(items);
+            }
         }
         
     } catch (error) {
@@ -880,7 +1186,7 @@ async function extractText(filePath: string, mimeType: string): Promise<string> 
 
 async function generateWithRetry(
     prompt: string, 
-    type: 'flashcard' | 'quiz',
+    type: string,
     maxRetries: number = 1
 ): Promise<any[]> {
     
