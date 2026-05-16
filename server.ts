@@ -501,7 +501,7 @@ app.post("/api/chat", async function(req, res) {
         console.log('🤖 Calling Gemini...');
         
         const response = await genAI.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-flash-lite-latest",
             contents: fullPrompt
         });
         
@@ -687,41 +687,112 @@ app.post("/api/create-ai-plane", upload.single("file"), async function(req, res)
         let studyPlanData = null;
 
         try {
-            const planPrompt = `
-            Sei un esperto tutor AI. Analizza il testo e genera una diagnosi completa + piano di studio personalizzato.
+           const planPrompt = 
+           `Sei un tutor AI esperto di apprendimento efficace.
+
+            Analizza il testo e genera una diagnosi completa + piano di studio strutturato per una dashboard interattiva.
+
             TESTO:
             ${chunks}
 
             OBIETTIVO:
-            Restituisci un JSON COMPLETO per popolare una dashboard di studio.
+            Restituisci un JSON COMPLETO per popolare una dashboard moderna (diagnosi + piano + timeline + next action).
+            IL TEMPO STIMATO DI STUDIO DEVE ESSERE REALISTICO
 
             FORMATO JSON OBBLIGATORIO (NESSUN testo extra):
 
             {
-            "documentName": "Nome del documento (breve)",
+            "documentName": "Nome breve documento",
+
             "topics": ["argomento1", "argomento2", "argomento3"],
+
             "difficulty": "Facile | Intermedia | Difficile",
             "difficultyReason": "breve spiegazione",
+
             "estimatedTime": "es: 6 ore",
-            
+
             "stats": {
-                "pagesAnalyzed": numero stimato,
-                "keywords": numero stimato,
+                "pagesAnalyzed": numero,
+                "keywords": numero,
                 "sessions": "es: 8-12",
                 "completion": "es: 7-10 giorni"
             },
 
             "risk": {
                 "level": "Basso | Medio | Alto",
-                "message": "spiegazione semplice del rischio"
+                "message": "spiegazione semplice"
+            },
+
+            "strategy": "es: Spaced Repetition + Quiz Mirati",
+
+            "timeline": [
+                {
+                "day": "Oggi",
+                "title": "Titolo breve",
+                "description": "cosa fare",
+                "duration": "es: 15 minuti",
+                "type": "quiz | flashcard | mixed",
+                "quizCount": numero,
+                "flashcardCount": numero,
+                "difficulty": "Facile | Intermedia | Difficile",
+                "priority": "Alta | Media | Bassa",
+                "successRate": numero (0-100)
+                },
+                {
+                "day": "Domani",
+                "title": "Titolo",
+                "description": "descrizione",
+                "duration": "es: 20 minuti",
+                "type": "quiz | flashcard | mixed",
+                "quizCount": numero,
+                "flashcardCount": numero,
+                "difficulty": "Facile | Intermedia | Difficile",
+                "priority": "Media",
+                "successRate": numero
+                },
+                {
+                "day": "Tra 2 giorni",
+                "title": "Titolo",
+                "description": "descrizione",
+                "duration": "es: 30 minuti",
+                "type": "mixed",
+                "quizCount": numero,
+                "flashcardCount": numero,
+                "difficulty": "Intermedia",
+                "priority": "Media",
+                "successRate": numero
+                },
+                {
+                "day": "Tra 7 giorni",
+                "title": "Esame simulato",
+                "description": "test completo",
+                "duration": "es: 45 minuti",
+                "type": "exam",
+                "quizCount": numero,
+                "flashcardCount": 0,
+                "difficulty": "Difficile",
+                "priority": "Alta",
+                "successRate": numero
+                }
+            ],
+
+            "nextAction": {
+                "title": "Titolo azione",
+                "description": "spiegazione breve",
+                "duration": "es: 15 minuti",
+                "questions": numero,
+                "difficulty": "Facile | Intermedia | Difficile"
+            }
             }
 
             REGOLE IMPORTANTI:
-            - Massimo 3-6 topic
-            - Piano realistico (non troppo lungo)
-            - Linguaggio semplice
-            - Coerente con il contenuto
-            - Rispondi SOLO con JSON valido`
+            - 3-6 topic massimo
+            - timeline di 3-4 step (non di più)
+            - numeri realistici
+            - linguaggio semplice
+            - coerente con il testo
+            - niente testo fuori dal JSON
+            - JSON valido al 100%`
             
             const planResult = await generateWithRetry(planPrompt, 'plan');
             
@@ -822,8 +893,6 @@ app.post("/api/create-ai-plane", upload.single("file"), async function(req, res)
     }
 })
 
-
-
 //2. Controllo token
 //la richiamo solo quando richiedo una risorsa /api
 app.use("/api", function(req:any,res,next){
@@ -858,183 +927,48 @@ function extractJSON(text: string, type: string): any[] {
     console.log(`🔍 Extracting ${type} JSON...`);
     
     if (!text || typeof text !== 'string') {
-        console.warn('⚠️ Empty or invalid text');
         return [];
     }
     
     try {
-        // ✅ STEP 1: Pulizia base
         let cleaned = text
             .replace(/```json/gi, '')
             .replace(/```/g, '')
-            .replace(/^[^[{]*/, '') // Rimuovi tutto prima di [ o {
-            .replace(/[^}\]]*$/, '') // Rimuovi tutto dopo ] o }
             .trim();
-        
-        // ✅ STEP 2: Trova array JSON
-        const startBracket = cleaned.indexOf('[');
-        const endBracket = cleaned.lastIndexOf(']');
-        
-        if (startBracket !== -1 && endBracket !== -1 && startBracket < endBracket) {
-            cleaned = cleaned.substring(startBracket, endBracket + 1);
-        } else {
-            console.warn('⚠️ No valid JSON array found');
+
+        const start = cleaned.indexOf('[');
+        const end = cleaned.lastIndexOf(']');
+
+        if (start === -1 || end === -1) {
             return [];
         }
-        
-        // ✅ STEP 3: Normalizza spazi
-        cleaned = cleaned
-            .replace(/\n/g, ' ')
-            .replace(/\r/g, '')
-            .replace(/\t/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim();
-        
-        // ✅ STEP 4: Tentativi multipli di parsing
-        let parsed: any = null;
-        let attempts = 0;
-        const maxAttempts = 5;
-        
-        while (!parsed && attempts < maxAttempts) {
-            attempts++;
-            
-            try {
-                // Tentativo corrente
-                let current = cleaned;
-                
-                switch(attempts) {
-                    case 1:
-                        // Parsing diretto
-                        current = cleaned;
-                        break;
-                        
-                    case 2:
-                        // Fix virgolette
-                        current = cleaned.replace(/'/g, '"');
-                        break;
-                        
-                    case 3:
-                        // Fix virgole trailing
-                        current = cleaned
-                            .replace(/,\s*([}\]])/g, '$1')
-                            .replace(/'/g, '"');
-                        break;
-                        
-                    case 4:
-                        // Fix escape
-                        current = cleaned
-                            .replace(/\\"/g, '"')
-                            .replace(/\\\\/g, '\\')
-                            .replace(/,\s*([}\]])/g, '$1')
-                            .replace(/'/g, '"');
-                        break;
-                        
-                    case 5:
-                        // Ricostruzione manuale
-                        current = manualJSONReconstruction(cleaned, "plan");
-                        break;
-                }
-                
-                parsed = JSON.parse(current);
-                console.log(`✅ Parsed on attempt ${attempts}`);
-                
-            } catch (error: any) {
-                console.log(`❌ Attempt ${attempts} failed:`, error.message.substring(0, 100));
-            }
+
+        cleaned = cleaned.substring(start, end + 1);
+
+        let parsed;
+        try {
+            parsed = JSON.parse(cleaned);
+        } catch {
+            cleaned = cleaned
+                .replace(/'/g, '"')
+                .replace(/,\s*([}\]])/g, '$1');
+            parsed = JSON.parse(cleaned);
         }
-        
-        if (!parsed) {
-            console.error('❌ All parsing attempts failed');
-            return [];
-        }
-        
-        // ✅ STEP 5: Validazione struttura
+
         const result = Array.isArray(parsed) ? parsed : [parsed];
-        
+
         const validated = result.filter(item => {
-            if (type === 'flashcard') {
-                return validateFlashcard(item);
-            } else {
-                return validateQuiz(item);
-            }
+            if (type === 'flashcard') return validateFlashcard(item);
+            if (type === 'quiz') return validateQuiz(item);
+            return true; // ✅ FIX
         });
-        
-        console.log(`✅ Validated ${validated.length}/${result.length} items`);
-        
+
+        console.log(`✅ Validated ${validated.length}/${result.length}`);
         return validated;
-        
-    } catch (error: any) {
-        console.error('❌ Fatal extraction error:', error.message);
+
+    } catch (err: any) {
+        console.error('❌ JSON extract error:', err.message);
         return [];
-    }
-}
-
-// ============================================
-// MANUAL JSON RECONSTRUCTION
-// ============================================
-
-function manualJSONReconstruction(text: string, type: string): string {
-    console.log('🔧 Attempting manual JSON reconstruction...');
-    
-    try {
-        if (type === 'flashcard') {
-            // Cerca pattern: "front": "...", "back": "..."
-            const frontRegex = /"front"\s*:\s*"([^"]+)"/g;
-            const backRegex = /"back"\s*:\s*"([^"]+)"/g;
-            
-            const fronts = [...text.matchAll(frontRegex)].map(m => m[1]);
-            const backs = [...text.matchAll(backRegex)].map(m => m[1]);
-            
-            const items = [];
-            const len = Math.min(fronts.length, backs.length);
-            
-            for (let i = 0; i < len; i++) {
-                items.push({
-                    front: fronts[i],
-                    back: backs[i]
-                });
-            }
-            
-            return JSON.stringify(items);
-            
-        } else {
-            if(type == "plan"){
-                return text
-            }
-            else{
-            // Cerca pattern quiz
-            const questionRegex = /"question"\s*:\s*"([^"]+)"/g;
-            const optionsRegex = /"options"\s*:\s*\[([^\]]+)\]/g;
-            const correctRegex = /"correct"\s*:\s*(\d+)/g;
-            
-            const questions = [...text.matchAll(questionRegex)].map(m => m[1]);
-            const optionsSets = [...text.matchAll(optionsRegex)].map(m => {
-                return m[1]!.split(',').map(opt => 
-                    opt.trim().replace(/^["']|["']$/g, '')
-                );
-            });
-            const corrects = [...text.matchAll(correctRegex)].map(m => parseInt(m[1]!));
-            
-            const items = [];
-            const len = Math.min(questions.length, optionsSets.length, corrects.length);
-            
-            for (let i = 0; i < len; i++) {
-                if (optionsSets[i]!.length === 4) {
-                    items.push({
-                        question: questions[i],
-                        options: optionsSets[i],
-                        correct: corrects[i]
-                    });
-                }
-            }
-            
-            return JSON.stringify(items);
-            }
-        }
-        
-    } catch (error) {
-        console.error('❌ Manual reconstruction failed');
-        return '[]';
     }
 }
 
@@ -1187,18 +1121,18 @@ async function extractText(filePath: string, mimeType: string): Promise<string> 
 async function generateWithRetry(
     prompt: string, 
     type: string,
-    maxRetries: number = 1
-): Promise<any[]> {
+    maxRetries: number = 2
+): Promise<any> {
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
             console.log(`🤖 AI attempt ${attempt}/${maxRetries} for ${type}...`);
             
             const response = await genAI.models.generateContent({
-                model: "gemini-2.5-flash",
+                model: "gemini-flash-lite-latest",
                 contents: prompt,
                 config: {
-                    temperature: 0.3, // Più deterministico
+                    temperature: 0.2,
                     topP: 0.8,
                     topK: 40
                 }
@@ -1208,35 +1142,61 @@ async function generateWithRetry(
                 throw new Error('Empty response from AI');
             }
             
-            const text = response.text;
+            const text = response.text.trim();
             console.log(`📝 Raw AI response (${text.length} chars):`, text.substring(0, 200));
-            
+
+            // ✅ PLAN = OGGETTO JSON
+            if (type === 'plan') {
+                try {
+                    const cleaned = text
+                        .replace(/```json/gi, '')
+                        .replace(/```/g, '')
+                        .trim();
+
+                    const start = cleaned.indexOf('{');
+                    const end = cleaned.lastIndexOf('}');
+
+                    if (start === -1 || end === -1) {
+                        throw new Error("No JSON object found");
+                    }
+
+                    const jsonString = cleaned.substring(start, end + 1);
+                    const parsed = JSON.parse(jsonString);
+
+                    console.log("✅ Plan parsed correctly");
+                    return parsed;
+
+                } catch (err: any) {
+                    console.error("❌ Plan parse error:", err.message);
+                    throw err;
+                }
+            }
+
+            // ✅ FLASHCARD / QUIZ
             const items = extractJSON(text, type);
-            
+
             if (items.length > 0) {
                 console.log(`✅ Success: ${items.length} ${type}s extracted`);
                 return items;
             }
             
-            console.warn(`⚠️ Attempt ${attempt}: No valid items extracted, retrying...`);
-            
-            // Aspetta prima di ritentare
+            console.warn(`⚠️ Attempt ${attempt}: No valid items extracted`);
+
             if (attempt < maxRetries) {
-                await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+                await new Promise(r => setTimeout(r, 1000 * attempt));
             }
-            
+
         } catch (error: any) {
             console.error(`❌ Attempt ${attempt} failed:`, error.message);
-            
+
             if (attempt === maxRetries) {
                 throw error;
             }
-            
-            await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+
+            await new Promise(r => setTimeout(r, 1000 * attempt));
         }
     }
-    
-    return [];
+    return type === 'plan' ? null : [];
 }
 
 app.use("/",function(req,res,next){

@@ -1221,24 +1221,25 @@ if (dropZoneCoreSection) {
     });
 
     dropZoneCoreSection.addEventListener('click', () => {
-        fileInputCore.click();
+        fileInputCore.click()
     });
 
     fileInputCore.addEventListener('change', function() {
         if (this.files.length > 0) {
-            handleFileUpload(this.files[0]);
+            handleFileUpload(this.files[0])
         }
     });
 }
 
 // Analyze pasted text
 function analyzeText() {
-    const text = pasteContent.value.trim();
+    const text = pasteContent.value.trim()
     
     if (text.length < 100) {
-        alert('Inserisci almeno 100 caratteri per un\'analisi accurata.');
-        return;
+        msgMinCaratteri.classList.remove("hidden")
+        return
     }
+    msgMinCaratteri.classList.add("hidden")
     processContent('text', text);
 }
 
@@ -1310,6 +1311,8 @@ async function processContent(type, content) {
             for (const line of lines) {
                 if (!line.trim() || !line.startsWith('data: ')) continue;
                 
+                let flashcards
+                let quizzes
                 try {
                     const data = JSON.parse(line.slice(6));
                     
@@ -1341,23 +1344,25 @@ async function processContent(type, content) {
                     if (data.done) {
                         // Save data
                         if (data.flashcard) {
-                            const flashcards = JSON.parse(data.flashcard);
+                            flashcards = JSON.parse(data.flashcard);
                         }
                         
                         if (data.quiz) {
-                            const quizzes = JSON.parse(data.quiz);
+                            quizzes = JSON.parse(data.quiz);
                         }
                         
-                        if (data.extractedText) {
-
-                        }
                         processingStep.classList.add("hidden")
                         onboardingSection.classList.add("hidden")
                         resultsPage.classList.remove("hidden")
                         console.log(data)
                         documentName.textContent = documentoCorrente.get("file").name
+                        generatedFlashcard.textContent = flashcards.length
+                        generatedQuiz.textContent = quizzes.length
+                        generatedCount.textContent = parseInt(flashcards.length) + parseInt(quizzes.length)
                         sideFlashcardCount.textContent = flashcards.length
-                        sideQuizCount.textContent = quizzes.length
+                        sideQuizCount.textContent = quizzes.length;
+                        populateStudyPlan(data.plan)
+
                     }
                     
                 } catch (e) {
@@ -1374,6 +1379,73 @@ async function processContent(type, content) {
         document.getElementById('processingStep').classList.add('hidden');
         document.getElementById('step0').classList.remove('hidden');
     }
+}
+
+function populateStudyPlan(data) {
+    if (!data) return;
+
+    // TOPICS
+    topicCount.textContent = data.topics.length;
+    topicsList.textContent = data.topics.join(", ");
+
+    // DIFFICULTY
+    difficulty.textContent = data.difficulty;
+    difficultyReason.textContent = data.difficultyReason;
+
+    // TIME
+    estimatedTime.textContent = data.estimatedTime;
+
+    // RISK
+    riskLevel.textContent = data.risk.level;
+    riskMessage.textContent = data.risk.message;
+
+    // STRATEGY
+    strategy.textContent = data.strategy;
+
+    // STATS
+    pagesAnalyzed.textContent = data.stats.pagesAnalyzed;
+    keywords.textContent = data.stats.keywords;
+    sessions.textContent = data.stats.sessions;
+    completion.textContent = data.stats.completion;
+
+    // NEXT ACTION
+    nextActionTitleResultsPage.textContent = data.nextAction.title;
+    nextActionDescriptionResultsPage.textContent = data.nextAction.description;
+    nextActionTimeResultsPage.textContent = data.nextAction.duration;
+    nextActionQuestionsResultsPage.textContent = data.nextAction.questions;
+    nextActionDifficoltyResultsPage.textContent = data.nextAction.difficulty;
+
+    // TIMELINE
+    renderTimeline(data.timeline);
+}
+
+function renderTimeline(days) {
+    const container = document.getElementById("studyPlanTimeline");
+    container.innerHTML = "";
+
+    days.forEach((day, index) => {
+        const isFirst = index === 0;
+        const borderColor = isFirst ? "border-indigo-500" : "border-gray-300";
+        const dotColor = isFirst ? "bg-indigo-500" : "bg-gray-300";
+
+        const html = `
+        <div class="relative pl-8 pb-8 border-l-2 ${borderColor}">
+            <div class="absolute -left-[9px] top-0 w-4 h-4 ${dotColor} rounded-full border-4 border-white"></div>
+
+            <div class="bg-white rounded-xl p-4 border border-gray-200">
+                <div class="flex justify-between mb-2">
+                    <span class="text-xs font-bold uppercase">${day.day}</span>
+                    <span class="text-xs text-gray-500">${day.duration}</span>
+                </div>
+
+                <h3 class="font-semibold">${day.title}</h3>
+                <p class="text-sm text-gray-600 mb-2">${day.description}</p>
+            </div>
+        </div>
+        `;
+
+        container.innerHTML += html;
+    });
 }
 
 // ============================================
@@ -1504,11 +1576,12 @@ function completeOnboarding() {
 
 function startStudying() {
     // Nascondi results, mostra dashboard
-    document.getElementById('resultsPage').classList.add('hidden');
-    document.getElementById('dashboard').classList.remove('hidden');
-    
-    // Trigger first session
-    startNextAction();
+    resultsPage.classList.add('hidden');
+    authSection.classList.remove('hidden');
+    loginForm.classList.add("hidden")
+    signupForm.classList.remove("hidden")
+    authSectionWelcome.textContent = "Benvenuto"
+    authSectionLogin.textContent = "Registrati"
 }
 
 function showFlashcards() {
