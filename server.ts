@@ -5,7 +5,7 @@ import https from "https"
 import fs from "fs"
 import express, { CookieOptions, NextFunction } from "express"
 import dotenv from "dotenv"
-import {MongoClient} from "mongodb"
+import {MongoClient, ObjectId} from "mongodb"
 import queryStringParser from "./queryStringParser"
 import cors from "cors"
 import multer from 'multer'
@@ -892,6 +892,70 @@ app.post("/api/create-ai-plane", upload.single("file"), async function(req, res)
         }
     }
 })
+
+app.post("/api/saveStudyData", async function(req, res) {
+    const client = new MongoClient(connectionString!);
+    
+    try {
+        await client.connect();
+        const db = client.db(dbName);
+        
+        // 1. Recuperiamo i dati dal body e l'ID utente dal token (o dal body per test)
+        // Assumo che tu abbia il userId disponibile (es. da un middleware di autenticazione)
+        const userId = req.body.userId
+        const { extractedText, plan, flashcard, quiz } = req.body;
+
+        // 2. Parsiamo le stringhe JSON che arrivano dal frontend
+        const flashcardsArray = JSON.parse(flashcard);
+        const quizArray = JSON.parse(quiz);
+
+        // --- OPERAZIONE 1: Salva il Materiale (Il "Contenitore") ---
+        const materialResult = await db.collection("plan").insertOne({
+            _id: new ObjectId(userId),
+            titolo: plan.documentName || "Nuovo Materiale",
+            pianoStudio: plan,
+            testoEstratto: extractedText,
+            dataCreazione: new Date()
+        });
+
+        const materialId = materialResult.insertedId;
+
+        // --- OPERAZIONE 2: Salva le Flashcard ---
+        // Aggiungiamo il materialId e userId a ogni singola flashcard
+        const flashcardsToSave = flashcardsArray.map((f:any) => ({
+            ...f,
+            materialId: materialId,
+            userId: userId
+        }));
+        
+        if (flashcardsToSave.length > 0) {
+            await db.collection("flashcards").insertMany(flashcardsToSave);
+        }
+
+        // --- OPERAZIONE 3: Salva i Quiz ---
+        const quizToSave = quizArray.map((q:any) => ({
+            ...q,
+            materialId: materialId,
+            userId: userId
+        }));
+
+        if (quizToSave.length > 0) {
+            await db.collection("quizzes").insertMany(quizToSave);
+        }
+
+        // Risposta di successo
+        res.status(200).send({
+            message: "Tutto salvato con successo!",
+            materialId: materialId
+        });
+
+    } catch (err:any) {
+        console.error("Errore durante il salvataggio:", err);
+        res.status(500).send("Errore interno del server: " + err.message);
+    } finally {
+        await client.close();
+    }
+});
 
 //2. Controllo token
 //la richiamo solo quando richiedo una risorsa /api

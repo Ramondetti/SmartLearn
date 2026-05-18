@@ -7,6 +7,7 @@ let quizGlobal = []
 let currentIndex = 0;
 let isFlipped = false;
 let viewMode = "single";
+let dataToSave
 
 // ============================================
 // AI TUTOR - VARIABILI GLOBALI
@@ -390,10 +391,9 @@ goToAIFromQuiz.addEventListener("click", function() {
     }
 });
 
-backToResultsFromAI.addEventListener("click", function() {
-    aiTutorSection.classList.add("hidden");
-    sezioneResults.classList.remove("hidden");
-});
+/*backToResultsFromAI.addEventListener("click", function() {
+    backToResultsFromAIFunction("sezioneResults")
+});*/
 
 showSectionStartNav.addEventListener("click",function(){
     homepage.classList.add("hidden")
@@ -451,6 +451,15 @@ else{
 }
 })
 
+function backToResultsFromAIFunction(sezione){
+    aiTutorSection.classList.add("hidden");
+    console.log(sezione)
+    if(sezione == "sezioneResults")
+        sezioneResults.classList.remove("hidden");
+    else
+        resultsPage.classList.remove("hidden")
+}
+
 async function handleLogin(event){
     event.preventDefault()
     const httResponse = await inviaRichiesta("POST","/login",{"username":loginEmail.value,"password":loginPassword.value})
@@ -478,6 +487,13 @@ async function handleSignup(event){
             authSection.classList.add("hidden")
             dashboard.classList.remove("hidden")
             spanIniziale.textContent = httResponse.data.nome[0].toUpperCase()
+            dataToSave["userId"] = httResponse.data._id
+            const responseSavement = await inviaRichiesta("POST","/saveStudyData",dataToSave)
+            if(responseSavement.status == 200){
+                console.log(responseSavement.data)
+            }
+            else
+                console.log("Errore: " ,responseSavement.err)
         }
         else{
             if(httResponse.status == 400)
@@ -745,12 +761,18 @@ function caricaDatiQuiz() {
     const prevBtn = document.getElementById("prevQuiz");
     const nextBtn = document.getElementById("nextQuiz");
     const retryBtn = document.getElementById("retryQuiz");
+    
+    if (quizMainCard) quizMainCard.classList.remove("hidden");
+    if (resultEl) resultEl.classList.add("hidden");
+
+    console.log(answersEl)
 
     totalEl.textContent = "/ " + quizData.length;
 
     function renderQuestion() {
 
         const q = quizData[currentQuestion];
+        console.log(q)
 
         answered = false;
         feedbackEl.classList.add("hidden");
@@ -768,6 +790,7 @@ function caricaDatiQuiz() {
             btn.className =
                 "quiz-option hover:cursor-pointer w-full rounded-xl border border-gray-200 bg-white px-6 py-4 text-left text-gray-700 font-medium transition hover:border-purple-500 hover:bg-purple-50";
             btn.textContent = answer;
+            console.log(answer)
             btn.onclick = () => {
 
                 if (answered) return;
@@ -797,6 +820,7 @@ function caricaDatiQuiz() {
                 }
                 feedbackEl.classList.remove("hidden");
             };
+            console.log(btn)
             answersEl.appendChild(btn);
         });
     }
@@ -818,14 +842,12 @@ function caricaDatiQuiz() {
     };
 
     function showResult() {
-
         document.querySelector(".bg-white.rounded-2xl.shadow-lg.border").classList.add("hidden");
         resultEl.classList.remove("hidden");
         scoreEl.textContent = score + " / " + quizData.length;
     }
 
     retryBtn.onclick = () => {
-
         currentQuestion = 0;
         score = 0;
         resultEl.classList.add("hidden");
@@ -1355,6 +1377,9 @@ async function processContent(type, content) {
                         onboardingSection.classList.add("hidden")
                         resultsPage.classList.remove("hidden")
                         console.log(data)
+                        dataToSave = data
+                        flashcardGlobal = flashcards
+                        quizGlobal = quizzes
                         documentName.textContent = documentoCorrente.get("file").name
                         generatedFlashcard.textContent = flashcards.length
                         generatedQuiz.textContent = quizzes.length
@@ -1430,7 +1455,7 @@ function renderTimeline(days) {
 
         const html = `
         <div class="relative pl-8 pb-8 border-l-2 ${borderColor}">
-            <div class="absolute -left-[9px] top-0 w-4 h-4 ${dotColor} rounded-full border-4 border-white"></div>
+            <div class="absolute -left-2.25 top-0 w-4 h-4 ${dotColor} rounded-full border-4 border-white"></div>
 
             <div class="bg-white rounded-xl p-4 border border-gray-200">
                 <div class="flex justify-between mb-2">
@@ -1585,20 +1610,35 @@ function startStudying() {
 }
 
 function showFlashcards() {
-    const flashcards = JSON.parse(localStorage.getItem('flashcards') || '[]');
-    // Open flashcard viewer modal
-    console.log('Show', flashcards.length, 'flashcards');
+    resultsPage.classList.add("hidden")
+    flashcardsSection.classList.remove("hidden");
+    
+    caricaDatiFlashcard()
 }
 
 function showQuizzes() {
-    const quizzes = JSON.parse(localStorage.getItem('quizzes') || '[]');
-    // Open quiz session
-    console.log('Start quiz with', quizzes.length, 'questions');
+    resultsPage.classList.add("hidden")
+    quizSection.classList.remove("hidden")
+    caricaDatiQuiz()
 }
 
 function openAITutor() {
-    // Open AI chat modal
-    console.log('Open AI Tutor');
+    resultsPage.classList.add("hidden")
+    aiTutorSection.classList.remove("hidden");
+    
+    if (chatHistory.length === 0) {
+        showSuggestedQuestions();
+    }
+
+    backToResultsFromAI.remove()
+    const div = `<button id="backToResultsFromAI" onclick='backToResultsFromAIFunction("result")'
+     class="px-4 py-2 hover:bg-gray-100 text-gray-700 rounded-lg transition flex items-center gap-2">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+        </svg>
+        <span>Indietro</span>
+     </button>`
+    divPadreBackToResultsFromAI.innerHTML = div
 }
 
 function goToDashboard() {
