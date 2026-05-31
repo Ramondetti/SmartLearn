@@ -118,56 +118,55 @@ const cookiesOption:CookieOptions = {
     "httpOnly":true, // il cookie non è visibile da javascript
     "secure":true, //il cookie è trasmesso solo su canali HTTPS
     "maxAge": parseInt(process.env.durata_token!) * 1000, //durata relativa a partire da adesso espressa in ms
-    "sameSite":"none" //i cookie devono essere trasmessi oltre domain
+    "sameSite":"lax" //i cookie devono essere trasmessi oltre domain
 }
 
-app.post("/api/login",async function(req,res,next){
-    const email = req.body.username
-    const password = req.body.password
+app.post("/api/loginWithGoogle", async function(req, res, next) {
+    const googleToken = req.body.googleToken;
 
-    const client = new MongoClient(connectionString!)
-    await client.connect().catch(function(err){
-        res.status(503).send("Errore di connessione al dbms")
-        return
-    })
+    // 1. Chiediamo a Google i dati dell'utente usando il token
+    const googleResponse = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+        headers: { "Authorization": `Bearer ${googleToken}` }
+    });
 
-    const collection = client.db(dbName).collection("utenti")
+    // Se il token non è valido, Google risponderà con un errore
+    if (!googleResponse.ok) {
+        return res.status(401).send("Token Google non valido o scaduto");
+    }
 
-    const cmd = collection.findOne({"email":email})
+    const payload = await googleResponse.json(); // Qui hai i dati: { email, name, ... }
+    
+    const client = new MongoClient(connectionString!);
+    try {
+        await client.connect();
+        const collection = client.db(dbName).collection("utenti");
+        
+        // 2. Usiamo payload.email (che ora è valorizzato correttamente)
+        const existingUser = await collection.findOne({ username: payload.email });
 
-    cmd.catch(function(err){
-        res.status(500).send("Errore esecuzione query: " + err)
-    })
-
-    cmd.then(function(dbUser){ //gli indietta l'intero record utente (compresa la password)
-        if(!dbUser)
-            res.status(401).send("Username non valido")
-        else{
-            //console.log("Passord ricevuta: ", password, "Password DB: ", dbUser.password)
-            bcrypt.compare(password,dbUser.password, function(err,ok){
-                if(err){
-                    res.status(500).send("bcrypt execution error")
-                    console.log(err.stack)
-                }
-                else{
-                    if(!ok)
-                        res.status(401).send("Password non valida")
-                    else{
-                        const token = createToken(dbUser)
-                        res.cookie("token",token,cookiesOption)
-                        console.log("Cookie: ", res.getHeader("set-cookie"))
-                        res.send({"_id":dbUser._id, "nome":dbUser.nome})
-                    }
-                }
-            })
+        if (existingUser) {
+            return res.status(400).send("Utente già registrato");
         }
-    })
 
-    cmd.finally(function(){
-        client.close()
-    })
+        const newUser:any = {
+            username: payload.email,
+            nome: payload.name || "",
+            password: ""
+        };
+        
+        const mongoResponse = await collection.insertOne(newUser);
+        newUser._id = mongoResponse.insertedId;
+        
+        let TOKEN = createToken(newUser);
+        res.cookie("TOKEN", TOKEN, cookiesOption);
+        res.send({ "ris": "ok","_id":newUser._id, "username": newUser.username, "nome":newUser.nome });
 
-})
+    } catch (err) {
+        res.status(500).send("Errore esecuzione: " + err);
+    } finally {
+        await client.close();
+    }
+});
 
 function createToken(data:any){
     //getTime restituisce il TIME UNIX in millisecondi
@@ -962,10 +961,10 @@ app.post("/api/saveStudyData", async function(req, res) {
 app.use("/api", function(req:any,res,next){
     //cookie è la collezione dei cookies, andiamo a vedere se nella collezione
     //dei cookies c'è un cookie chiamato token
-    if(!req.cookies || !req.cookies.token)
+    if(!req.cookies || !req.cookies.TOKEN)
         res.status(403).send("Token mancante")
     else{
-        let token = req.cookies.token
+        let token = req.cookies.TOKEN
         jwt.verify(token, jwtKey, function(err:any, payload: any){
             if(err){
                 console.log("Token scaduto o non valido")
@@ -981,6 +980,28 @@ app.use("/api", function(req:any,res,next){
             }
         })
     }
+})
+
+app.get("/api/getPlan",async function(req,res,next){
+    const id:any = req.query.id
+    const client = new MongoClient(connectionString!)
+    await client.connect().catch(function(err){
+        res.status(503).send("Errore di connessione al dbms")
+        return
+    })
+    const collection = client.db(dbName).collection("plan")
+    const cmd = collection.findOne({"_id":new ObjectId(id)})
+    cmd.catch(function(err){
+        res.status(500).send("Errore esecuzione query: " + err)
+    })
+
+    cmd.then(function(data){
+        res.send(data)
+    })
+
+    cmd.finally(function(){
+        client.close()
+    })
 })
 
 // ============================================

@@ -8,6 +8,7 @@ let currentIndex = 0;
 let isFlipped = false;
 let viewMode = "single";
 let dataToSave
+const googleClientId = "99632147794-fuhq76pci5hk7dh2uglkeddcs7fjqjpc.apps.googleusercontent.com";
 
 // ============================================
 // AI TUTOR - VARIABILI GLOBALI
@@ -491,6 +492,14 @@ async function handleSignup(event){
             const responseSavement = await inviaRichiesta("POST","/saveStudyData",dataToSave)
             if(responseSavement.status == 200){
                 console.log(responseSavement.data)
+                const getPlanResponse = await inviaRichiesta("GET","/getPlan",{"id":apiResponse.data._id})
+                if(getPlanResponse.status == 200){
+                    console.log(getPlanResponse.data)
+                    populateDashboard(getPlanResponse.data)
+                }
+                else
+                    console.log("Errore: " ,getPlanResponse.err)
+
             }
             else
                 console.log("Errore: " ,responseSavement.err)
@@ -499,7 +508,7 @@ async function handleSignup(event){
             if(httResponse.status == 400)
                 msgErroreRegistrazione.classList.remove("hidden")
             else
-                alert(httResponse.status + " : " + httResponse.err)
+                console.log(httResponse.status + " : " + httResponse.err)
         }
 }
 
@@ -1641,33 +1650,329 @@ function openAITutor() {
     divPadreBackToResultsFromAI.innerHTML = div
 }
 
-function goToDashboard() {
-    document.getElementById('resultsPage').classList.add('hidden');
-    document.getElementById('dashboard').classList.remove('hidden');
+function handleGoogleAuth(){
+    const client = google.accounts.oauth2.initTokenClient({
+        client_id: googleClientId,
+        scope: 'email profile',
+        callback: async (response) => {
+            if (response.access_token) {
+                // 2. Invia il token al TUO backend
+                const apiResponse = await inviaRichiesta("POST","/loginWithGoogle",{"googleToken": response.access_token })
+                if(apiResponse.status == 200){
+                    console.log(apiResponse.data)
+                    authSection.classList.add('hidden');
+                    signupForm.classList.add("hidden")
+                    dashboard.classList.remove("hidden")
+                    spanIniziale.textContent = apiResponse.data.nome[0].toUpperCase()
+                    dataToSave["userId"] = apiResponse.data._id
+                    const responseSavement = await inviaRichiesta("POST","/saveStudyData",dataToSave)
+                    if(responseSavement.status == 200){
+                        console.log(responseSavement.data)
+                        const getPlanResponse = await inviaRichiesta("GET","/getPlan",{"id":apiResponse.data._id})
+                        if(getPlanResponse.status == 200){
+                            console.log(getPlanResponse.data)
+                            populateDashboard(getPlanResponse.data)
+                        }
+                        else
+                            console.log("Errore: " ,getPlanResponse.err)
+                    }
+                    else
+                        console.log("Errore: " ,responseSavement.err)
+                }
+                else{
+                    if(apiResponse.status == 400)
+                        msgErroreRegistrazione.classList.remove("hidden")
+                    else
+                        console.log(apiResponse.status + " : " + apiResponse.err)
+                }
+            }
+        },
+    });
+    client.requestAccessToken();
 }
 
-function downloadPDF() {
-    // Generate PDF with study plan
-    console.log('Download study plan PDF');
-}
+// ============================================
+// POPOLA DASHBOARD - FUNZIONE COMPLETA
+// ============================================
 
-function shareResults() {
-    // Share functionality
-    if (navigator.share) {
-        navigator.share({
-            title: 'Il mio Piano di Studio SmartLearn',
-            text: 'Ho creato un piano di studio personalizzato per Probabilità!',
-            url: window.location.href
-        });
+function populateDashboard(planData) {
+    console.log('📊 Populating dashboard with:', planData);
+    
+    if (!planData || !planData.pianoStudio) {
+        console.error('❌ Dati piano studio mancanti');
+        return false;
+    }
+    
+    const plan = planData.pianoStudio;
+    
+    try {
+        // ============================================
+        // 1. USER INFO (iniziale)
+        // ============================================
+        if (planData.userData?.nome) {
+            const iniziale = planData.userData.nome[0].toUpperCase();
+            document.getElementById('spanIniziale').textContent = iniziale;
+        }
+        
+        // ============================================
+        // 2. NEXT ACTION CARD
+        // ============================================
+        const nextAction = plan.timeline?.[0] || plan.nextAction;
+        if (nextAction) {
+            const icon = getIconByType(nextAction.type);
+            document.getElementById('nextActionIcon').textContent = icon;
+            document.getElementById('nextActionTitle').textContent = nextAction.title || 'Sessione di studio';
+            document.getElementById('nextActionReason').textContent = nextAction.description || 'Inizia la tua sessione di studio';
+            document.getElementById('nextActionDuration').textContent = nextAction.duration + ' minuti';
+            document.getElementById('nextActionPriority').textContent = nextAction.priority || 'Priorità Media';
+        }
+        
+        // ============================================
+        // 3. QUICK STATS (TOP RIGHT)
+        // ============================================
+        const totalDuration = plan.timeline?.reduce((sum, s) => sum + (s.duration || 0), 0) || 0;
+        document.getElementById('availableTime').textContent = totalDuration + ' minuti totali';
+        
+        const totalSessions = plan.timeline?.length || 0;
+        const completedSessions = planData.sessionStats?.completedSessions || 0;
+        document.getElementById('sessionsToday').textContent = completedSessions + ' / ' + totalSessions;
+        
+        const overallLevel = calculateOverall(plan.timeline || []);
+        document.getElementById('examProgress').textContent = overallLevel + '%';
+        
+        // ============================================
+        // 4. DIAGNOSIS - OVERALL LEVEL
+        // ============================================
+        document.getElementById('overallLevel').textContent = overallLevel + '%';
+        
+        // ============================================
+        // 5. DIAGNOSIS - TOPICS ANALYSIS
+        // ============================================
+        populateTopicsAnalysis(plan.topics, planData.topicsStats);
+        
+        // ============================================
+        // 6. RISK ALERT
+        // ============================================
+        if (plan.risk) {
+            // Elemento risk è già nel DOM, potrebbe essere nascosto/mostrato
+            const riskAlert = document.querySelector('[class*="Allerta Rischio"]')?.parentElement;
+            if (riskAlert) {
+                riskAlert.classList.toggle('hidden', plan.risk.level === 'Basso');
+            }
+        }
+        
+        // ============================================
+        // 7. MATERIALS
+        // ============================================
+        populateMaterials(planData);
+        
+        // ============================================
+        // 8. TIMELINE
+        // ============================================
+        populateTimeline(plan.timeline || []);
+        
+        // ============================================
+        // 9. DAILY STATS (RIGHT SIDEBAR)
+        // ============================================
+        if (planData.sessionStats) {
+        const stats = planData.sessionStats;
+    
+        // Time studied
+        const timeRatio = (stats.timeStudied || 0) / (stats.timeGoal || 60);
+        const timeSection = document.getElementById('timeStudiedSection');
+        if (timeSection) {
+            timeSection.innerHTML = `
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-sm text-gray-600">Tempo studiato</span>
+                <span class="text-sm font-bold text-indigo-600">${stats.timeStudied || 0} / ${stats.timeGoal || 60} min</span>
+            </div>
+            <div class="w-full bg-gray-100 rounded-full h-2">
+                <div class="bg-linear-to-r from-indigo-600 to-purple-600 h-2 rounded-full transition-all" style="width: ${Math.min(timeRatio * 100, 100)}%"></div>
+            </div>
+        `;
+    }
+    
+    // Tasks completed
+    const taskRatio = (stats.tasksCompleted || 0) / (stats.tasksGoal || 5);
+    const tasksSection = document.getElementById('tasksCompletedSection');
+    if (tasksSection) {
+        tasksSection.innerHTML = `
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-sm text-gray-600">Task completati</span>
+                <span class="text-sm font-bold text-green-600">${stats.tasksCompleted || 0} / ${stats.tasksGoal || 5}</span>
+            </div>
+            <div class="w-full bg-gray-100 rounded-full h-2">
+                <div class="bg-green-500 h-2 rounded-full transition-all" style="width: ${Math.min(taskRatio * 100, 100)}%"></div>
+            </div>
+        `;
+    }
+    
+    // Accuracy
+    const accuracySection = document.getElementById('accuracySection');
+    if (stats.accuracy && accuracySection) {
+        accuracySection.innerHTML = `
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-sm text-gray-600">Accuratezza quiz</span>
+                <span class="text-sm font-bold text-purple-600">${stats.accuracy}%</span>
+            </div>
+            <div class="w-full bg-gray-100 rounded-full h-2">
+                <div class="bg-purple-500 h-2 rounded-full transition-all" style="width: ${stats.accuracy}%"></div>
+            </div>
+        `;
+    }
+        }
+        
+        // ============================================
+        // 10. STREAK
+        // ============================================
+        if (planData.streak !== undefined) {
+            document.getElementById('streakDays').textContent = planData.streak;
+        }
+        
+        console.log('✅ Dashboard populated successfully');
+        return true;
+        
+    } catch (error) {
+        console.error('❌ Error populating dashboard:', error);
+        return false;
     }
 }
 
-function showSignup() {
-    // Show signup modal
-    console.log('Show signup modal');
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+
+function getIconByType(type) {
+    const icons = {
+        'quiz': '❓',
+        'flashcard': '📚',
+        'mixed': '🎯',
+        'review': '🔄',
+        'exam': '🎓'
+    };
+    return icons[type] || '📚';
 }
 
-function continueAsGuest() {
-    // Just continue to dashboard
-    goToDashboard();
+function calculateOverall(timeline) {
+    if (!timeline?.length) return 60;
+    
+    const successRates = timeline
+        .filter(s => s.successRate)
+        .map(s => s.successRate);
+    
+    if (!successRates.length) return 60;
+    
+    const avg = successRates.reduce((a, b) => a + b, 0) / successRates.length;
+    return Math.round(avg);
+}
+
+function populateTopicsAnalysis(topics, topicsStats) {
+    const container = document.querySelector('[class*="Analisi per Argomento"]')?.parentElement;
+    if (!container) return;
+    
+    // Se non ci sono stats, crea dei dati di esempio
+    const exampleStats = [
+        { name: topics?.[0] || 'Argomento 1', accuracy: 92, emoji: '💪', color: 'green', status: 'Eccellente - Pronto per esame' },
+        { name: topics?.[1] || 'Argomento 2', accuracy: 68, emoji: '⚠️', color: 'yellow', status: 'Sufficiente - Serve ripasso' },
+        { name: topics?.[2] || 'Argomento 3', accuracy: 45, emoji: '🎯', color: 'red', status: 'Critico - Focus immediato' }
+    ];
+    
+    let html = '<h3 class="font-semibold text-gray-900 mb-3">Analisi per Argomento</h3>';
+    
+    exampleStats.forEach(stat => {
+        const colorClass = stat.color;
+        html += `
+            <div class="flex items-center gap-4 p-4 bg-${colorClass}-50 rounded-xl border border-${colorClass}-200">
+                <div class="w-10 h-10 bg-${colorClass}-500 rounded-lg flex items-center justify-center shrink-0">
+                    <span class="text-xl">${stat.emoji}</span>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center justify-between mb-1">
+                        <h4 class="font-semibold text-gray-900">${stat.name}</h4>
+                        <span class="text-sm font-bold text-${colorClass}-600">${stat.accuracy}%</span>
+                    </div>
+                    <div class="w-full bg-${colorClass}-200 rounded-full h-1.5">
+                        <div class="bg-${colorClass}-500 h-1.5 rounded-full" style="width: ${stat.accuracy}%"></div>
+                    </div>
+                    <p class="text-xs text-${colorClass}-700 mt-1">${stat.status}</p>
+                </div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+function populateMaterials(planData) {
+    const container = document.getElementById('materialsList');
+    if (!container) return;
+    
+    const plan = planData.pianoStudio;
+    const flashcardCount = plan.timeline?.reduce((sum, s) => sum + (s.flashcardCount || 0), 0) || 0;
+    const quizCount = plan.timeline?.reduce((sum, s) => sum + (s.quizCount || 0), 0) || 0;
+    
+    container.innerHTML = `
+        <div class="group p-4 bg-linear-to-r from-gray-50 to-white hover:from-indigo-50 hover:to-purple-50 rounded-xl border border-gray-200 hover:border-indigo-300 transition-all cursor-pointer">
+            <div class="flex items-start gap-4">
+                <div class="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center shrink-0">
+                    <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                    </svg>
+                </div>
+                <div class="flex-1">
+                    <div class="flex items-start justify-between mb-2">
+                        <div>
+                            <h3 class="font-semibold text-gray-900 mb-1">${planData.titolo || 'Materiale caricato'}</h3>
+                            <div class="flex items-center gap-2 text-xs text-gray-500">
+                                <span>Ultima attività: ${planData.lastAccessed || 'oggi'}</span>
+                                <span>•</span>
+                                <span>${flashcardCount} flashcard</span>
+                                <span>•</span>
+                                <span>${quizCount} quiz</span>
+                            </div>
+                        </div>
+                        <div class="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-bold">
+                            ${planData.mastery || 45}% padronanza
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button class="hover:cursor-pointer px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-700">
+                            Studia
+                        </button>
+                        <button class="hover:cursor-pointer px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-xs font-semibold hover:bg-gray-200">
+                            Ripassa
+                        </button>
+                        <button class="hover:cursor-pointer px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-xs font-semibold hover:bg-gray-200">
+                            Quiz
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function populateTimeline(timeline) {
+    const container = document.querySelector('[class*="Piano Studio"]')?.parentElement;
+    if (!container || !timeline.length) return;
+    
+    let html = '<h2 class="text-lg font-bold text-gray-900 mb-4">📅 Piano Studio</h2><div class="space-y-3">';
+    
+    timeline.slice(0, 3).forEach((session, i) => {
+        const borderColor = i === 0 ? 'indigo' : 'gray';
+        html += `
+            <div class="border-l-4 border-${borderColor}-500 pl-4 py-2">
+                <p class="text-sm font-bold text-${borderColor}-600">${session.dayLabel || 'Giorno ' + (i + 1)}</p>
+                <p class="font-semibold text-gray-900">${session.title}</p>
+                <p class="text-sm text-gray-600">${session.duration} min • ${session.items || (session.quizCount || 0) + (session.flashcardCount || 0)} elementi</p>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    
+    const targetDiv = container.querySelector('.space-y-3');
+    if (targetDiv) {
+        targetDiv.innerHTML = html;
+    }
 }

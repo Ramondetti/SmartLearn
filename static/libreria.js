@@ -9,7 +9,7 @@ async function inviaRichiesta(method, url="", params={}) {
 		"headers":{},
 		"mode": "cors",                  // default
 		"cache": "no-cache",             // default
-		"credentials": "same-origin",    // default
+		"credentials": "include",    // default
 		"redirect": "follow",            // default
 		"referrerPolicy": "no-referrer", // default no-referrer-when-downgrade
     }
