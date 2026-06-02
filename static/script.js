@@ -455,10 +455,15 @@ else{
 function backToResultsFromAIFunction(sezione){
     aiTutorSection.classList.add("hidden");
     console.log(sezione)
-    if(sezione == "sezioneResults")
+    if(sezione == "sezioneResults"){
         sezioneResults.classList.remove("hidden");
-    else
-        resultsPage.classList.remove("hidden")
+        return
+    }
+    if(sezione == "dashboard"){
+        dashboard.classList.remove("hidden")
+        return
+    }
+    resultsPage.classList.remove("hidden")
 }
 
 async function handleLogin(event){
@@ -495,7 +500,9 @@ async function handleSignup(event){
                 const getPlanResponse = await inviaRichiesta("GET","/getPlan",{"id":apiResponse.data._id})
                 if(getPlanResponse.status == 200){
                     console.log(getPlanResponse.data)
-                    populateDashboard(getPlanResponse.data)
+                    quizGlobal = getPlanResponse.data.quizzes
+                    flashcardGlobal = getPlanResponse.data.flashcards
+                    popolaDashboard(getPlanResponse.data)
                 }
                 else
                     console.log("Errore: " ,getPlanResponse.err)
@@ -579,12 +586,12 @@ chatInput.addEventListener('keydown', function(e) {
 
 function updateCharCount() {
     const count = chatInput.value.length;
-    charCount.textContent = count;
+    charCountCore.textContent = count;
     
     if (count > 2000) {
-        charCount.classList.add('text-red-500');
+        charCountCore.classList.add('text-red-500');
     } else {
-        charCount.classList.remove('text-red-500');
+        charCountCore.classList.remove('text-red-500');
     }
 }
 
@@ -1381,7 +1388,8 @@ async function processContent(type, content) {
                         if (data.quiz) {
                             quizzes = JSON.parse(data.quiz);
                         }
-                        
+                        console.log(data)
+                        testoEstratto = data.extractedText
                         processingStep.classList.add("hidden")
                         onboardingSection.classList.add("hidden")
                         resultsPage.classList.remove("hidden")
@@ -1668,10 +1676,12 @@ function handleGoogleAuth(){
                     const responseSavement = await inviaRichiesta("POST","/saveStudyData",dataToSave)
                     if(responseSavement.status == 200){
                         console.log(responseSavement.data)
-                        const getPlanResponse = await inviaRichiesta("GET","/getPlan",{"id":apiResponse.data._id})
+                        const getPlanResponse = await inviaRichiesta("GET","/getPlanQuizFlashcard",{"id":apiResponse.data._id})
                         if(getPlanResponse.status == 200){
                             console.log(getPlanResponse.data)
-                            populateDashboard(getPlanResponse.data)
+                            quizGlobal = getPlanResponse.data.quizzes
+                            flashcardGlobal = getPlanResponse.data.flashcards
+                            popolaDashboard(getPlanResponse.data)
                         }
                         else
                             console.log("Errore: " ,getPlanResponse.err)
@@ -1691,288 +1701,100 @@ function handleGoogleAuth(){
     client.requestAccessToken();
 }
 
-// ============================================
-// POPOLA DASHBOARD - FUNZIONE COMPLETA
-// ============================================
+function popolaDashboard(data) {
+  console.log(data)
+  const plan = data.plan
+  nextActionTitle.textContent = plan.pianoStudio.nextAction.title
+  nextActionDescription.textContent = plan.pianoStudio.nextAction.description
+  nextActionDuration.textContent = plan.pianoStudio.nextAction.duration
+  availableTime.textContent = plan.pianoStudio.estimatedTime
+  examProgress.textContent = plan.pianoStudio.mastery + "%"
+  completamento.textContent = plan.pianoStudio.mastery + "%"
+  quizCountDashboard.textContent = data.quizzes.length + " quiz"
+  flashcardCountDashboard.textContent = data.flashcards.length + " flashcard"
 
-function populateDashboard(planData) {
-    console.log('📊 Populating dashboard with:', planData);
-    
-    if (!planData || !planData.pianoStudio) {
-        console.error('❌ Dati piano studio mancanti');
-        return false;
-    }
-    
-    const plan = planData.pianoStudio;
-    
-    try {
-        // ============================================
-        // 1. USER INFO (iniziale)
-        // ============================================
-        if (planData.userData?.nome) {
-            const iniziale = planData.userData.nome[0].toUpperCase();
-            document.getElementById('spanIniziale').textContent = iniziale;
-        }
-        
-        // ============================================
-        // 2. NEXT ACTION CARD
-        // ============================================
-        const nextAction = plan.timeline?.[0] || plan.nextAction;
-        if (nextAction) {
-            const icon = getIconByType(nextAction.type);
-            document.getElementById('nextActionIcon').textContent = icon;
-            document.getElementById('nextActionTitle').textContent = nextAction.title || 'Sessione di studio';
-            document.getElementById('nextActionReason').textContent = nextAction.description || 'Inizia la tua sessione di studio';
-            document.getElementById('nextActionDuration').textContent = nextAction.duration + ' minuti';
-            document.getElementById('nextActionPriority').textContent = nextAction.priority || 'Priorità Media';
-        }
-        
-        // ============================================
-        // 3. QUICK STATS (TOP RIGHT)
-        // ============================================
-        const totalDuration = plan.timeline?.reduce((sum, s) => sum + (s.duration || 0), 0) || 0;
-        document.getElementById('availableTime').textContent = totalDuration + ' minuti totali';
-        
-        const totalSessions = plan.timeline?.length || 0;
-        const completedSessions = planData.sessionStats?.completedSessions || 0;
-        document.getElementById('sessionsToday').textContent = completedSessions + ' / ' + totalSessions;
-        
-        const overallLevel = calculateOverall(plan.timeline || []);
-        document.getElementById('examProgress').textContent = overallLevel + '%';
-        
-        // ============================================
-        // 4. DIAGNOSIS - OVERALL LEVEL
-        // ============================================
-        document.getElementById('overallLevel').textContent = overallLevel + '%';
-        
-        // ============================================
-        // 5. DIAGNOSIS - TOPICS ANALYSIS
-        // ============================================
-        populateTopicsAnalysis(plan.topics, planData.topicsStats);
-        
-        // ============================================
-        // 6. RISK ALERT
-        // ============================================
-        if (plan.risk) {
-            // Elemento risk è già nel DOM, potrebbe essere nascosto/mostrato
-            const riskAlert = document.querySelector('[class*="Allerta Rischio"]')?.parentElement;
-            if (riskAlert) {
-                riskAlert.classList.toggle('hidden', plan.risk.level === 'Basso');
-            }
-        }
-        
-        // ============================================
-        // 7. MATERIALS
-        // ============================================
-        populateMaterials(planData);
-        
-        // ============================================
-        // 8. TIMELINE
-        // ============================================
-        populateTimeline(plan.timeline || []);
-        
-        // ============================================
-        // 9. DAILY STATS (RIGHT SIDEBAR)
-        // ============================================
-        if (planData.sessionStats) {
-        const stats = planData.sessionStats;
-    
-        // Time studied
-        const timeRatio = (stats.timeStudied || 0) / (stats.timeGoal || 60);
-        const timeSection = document.getElementById('timeStudiedSection');
-        if (timeSection) {
-            timeSection.innerHTML = `
-            <div class="flex items-center justify-between mb-2">
-                <span class="text-sm text-gray-600">Tempo studiato</span>
-                <span class="text-sm font-bold text-indigo-600">${stats.timeStudied || 0} / ${stats.timeGoal || 60} min</span>
-            </div>
-            <div class="w-full bg-gray-100 rounded-full h-2">
-                <div class="bg-linear-to-r from-indigo-600 to-purple-600 h-2 rounded-full transition-all" style="width: ${Math.min(timeRatio * 100, 100)}%"></div>
-            </div>
-        `;
-    }
-    
-    // Tasks completed
-    const taskRatio = (stats.tasksCompleted || 0) / (stats.tasksGoal || 5);
-    const tasksSection = document.getElementById('tasksCompletedSection');
-    if (tasksSection) {
-        tasksSection.innerHTML = `
-            <div class="flex items-center justify-between mb-2">
-                <span class="text-sm text-gray-600">Task completati</span>
-                <span class="text-sm font-bold text-green-600">${stats.tasksCompleted || 0} / ${stats.tasksGoal || 5}</span>
-            </div>
-            <div class="w-full bg-gray-100 rounded-full h-2">
-                <div class="bg-green-500 h-2 rounded-full transition-all" style="width: ${Math.min(taskRatio * 100, 100)}%"></div>
-            </div>
-        `;
-    }
-    
-    // Accuracy
-    const accuracySection = document.getElementById('accuracySection');
-    if (stats.accuracy && accuracySection) {
-        accuracySection.innerHTML = `
-            <div class="flex items-center justify-between mb-2">
-                <span class="text-sm text-gray-600">Accuratezza quiz</span>
-                <span class="text-sm font-bold text-purple-600">${stats.accuracy}%</span>
-            </div>
-            <div class="w-full bg-gray-100 rounded-full h-2">
-                <div class="bg-purple-500 h-2 rounded-full transition-all" style="width: ${stats.accuracy}%"></div>
-            </div>
-        `;
-    }
-        }
-        
-        // ============================================
-        // 10. STREAK
-        // ============================================
-        if (planData.streak !== undefined) {
-            document.getElementById('streakDays').textContent = planData.streak;
-        }
-        
-        console.log('✅ Dashboard populated successfully');
-        return true;
-        
-    } catch (error) {
-        console.error('❌ Error populating dashboard:', error);
-        return false;
-    }
+  const topics = plan.pianoStudio.topics;
+  const container = document.getElementById('topicsContainer');
+  container.innerHTML = topics.map((topic, i) => `
+    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+      <div class="flex items-center gap-3">
+        <span class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 text-xs flex items-center justify-center font-bold shrink-0">${i + 1}</span>
+        <span class="text-sm font-medium text-gray-700">${topic}</span>
+      </div>
+    </div>
+  `).join('');
 }
 
-// ============================================
-// HELPER FUNCTIONS
-// ============================================
-
-function getIconByType(type) {
-    const icons = {
-        'quiz': '❓',
-        'flashcard': '📚',
-        'mixed': '🎯',
-        'review': '🔄',
-        'exam': '🎓'
-    };
-    return icons[type] || '📚';
-}
-
-function calculateOverall(timeline) {
-    if (!timeline?.length) return 60;
-    
-    const successRates = timeline
-        .filter(s => s.successRate)
-        .map(s => s.successRate);
-    
-    if (!successRates.length) return 60;
-    
-    const avg = successRates.reduce((a, b) => a + b, 0) / successRates.length;
-    return Math.round(avg);
-}
-
-function populateTopicsAnalysis(topics, topicsStats) {
-    const container = document.querySelector('[class*="Analisi per Argomento"]')?.parentElement;
-    if (!container) return;
-    
-    // Se non ci sono stats, crea dei dati di esempio
-    const exampleStats = [
-        { name: topics?.[0] || 'Argomento 1', accuracy: 92, emoji: '💪', color: 'green', status: 'Eccellente - Pronto per esame' },
-        { name: topics?.[1] || 'Argomento 2', accuracy: 68, emoji: '⚠️', color: 'yellow', status: 'Sufficiente - Serve ripasso' },
-        { name: topics?.[2] || 'Argomento 3', accuracy: 45, emoji: '🎯', color: 'red', status: 'Critico - Focus immediato' }
+startQuiz.addEventListener("click",function(){
+    dashboard.classList.add("hidden")
+    quizSection.classList.remove("hidden")
+    caricaDatiQuiz()
+    goToAIFromQuiz.remove()
+    backToFlashcards.remove()
+    const btnBack = document.createElement("button")
+    btnBack.textContent = "Torna indietro"
+    btnBack.addEventListener("click",function(){
+        dashboard.classList.remove("hidden")
+        quizSection.classList.add("hidden")
+    })
+    const classiDaAggiungere = [
+        "hover:cursor-pointer",
+        "rounded-xl",
+        "bg-purple-600",
+        "px-6",
+        "py-3",
+        "text-white",
+        "font-medium",
+        "hover:bg-purple-700",
+        "transition"
     ];
-    
-    let html = '<h3 class="font-semibold text-gray-900 mb-3">Analisi per Argomento</h3>';
-    
-    exampleStats.forEach(stat => {
-        const colorClass = stat.color;
-        html += `
-            <div class="flex items-center gap-4 p-4 bg-${colorClass}-50 rounded-xl border border-${colorClass}-200">
-                <div class="w-10 h-10 bg-${colorClass}-500 rounded-lg flex items-center justify-center shrink-0">
-                    <span class="text-xl">${stat.emoji}</span>
-                </div>
-                <div class="flex-1 min-w-0">
-                    <div class="flex items-center justify-between mb-1">
-                        <h4 class="font-semibold text-gray-900">${stat.name}</h4>
-                        <span class="text-sm font-bold text-${colorClass}-600">${stat.accuracy}%</span>
-                    </div>
-                    <div class="w-full bg-${colorClass}-200 rounded-full h-1.5">
-                        <div class="bg-${colorClass}-500 h-1.5 rounded-full" style="width: ${stat.accuracy}%"></div>
-                    </div>
-                    <p class="text-xs text-${colorClass}-700 mt-1">${stat.status}</p>
-                </div>
-            </div>
-        `;
-    });
-    
-    container.innerHTML = html;
-}
 
-function populateMaterials(planData) {
-    const container = document.getElementById('materialsList');
-    if (!container) return;
+    btnBack.classList.add(...classiDaAggiungere);
+    quizSectionBtns.appendChild(btnBack)
     
-    const plan = planData.pianoStudio;
-    const flashcardCount = plan.timeline?.reduce((sum, s) => sum + (s.flashcardCount || 0), 0) || 0;
-    const quizCount = plan.timeline?.reduce((sum, s) => sum + (s.quizCount || 0), 0) || 0;
-    
-    container.innerHTML = `
-        <div class="group p-4 bg-linear-to-r from-gray-50 to-white hover:from-indigo-50 hover:to-purple-50 rounded-xl border border-gray-200 hover:border-indigo-300 transition-all cursor-pointer">
-            <div class="flex items-start gap-4">
-                <div class="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center shrink-0">
-                    <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+})
+
+startFlashcard.addEventListener("click",function(){
+    dashboard.classList.add("hidden")
+    flashcardsSection.classList.remove("hidden")
+    caricaDatiFlashcard()
+
+    goToQuiz.remove()
+    goToAI.remove()
+
+    const btnBackFlashcard = document.createElement("button")
+    btnBackFlashcard.textContent = "Torna indietro"
+    btnBackFlashcard.addEventListener("click",function(){
+        dashboard.classList.remove("hidden")
+        flashcardsSection.classList.add("hidden")
+    })
+    const classiDaAggiungere = [
+        "hover:cursor-pointer",
+        "rounded-xl",
+        "bg-purple-600",
+        "px-6",
+        "py-3",
+        "text-white",
+        "font-medium",
+        "hover:bg-purple-700",
+        "transition"
+    ];
+
+    btnBackFlashcard.classList.add(...classiDaAggiungere);
+    fatherDivFlashcardBtns.appendChild(btnBackFlashcard)
+})
+
+btnNavigateToChat.addEventListener("click",function(){
+    dashboard.classList.add("hidden")
+    aiTutorSection.classList.remove("hidden")
+
+    backToResultsFromAI.remove()
+    divPadreBackToResultsFromAI.innerHTML = `
+            <button id="backToResultsFromAI" onclick="backToResultsFromAIFunction('dashboard')"
+                class="px-4 py-2 hover:bg-gray-100 text-gray-700 rounded-lg transition flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
                     </svg>
-                </div>
-                <div class="flex-1">
-                    <div class="flex items-start justify-between mb-2">
-                        <div>
-                            <h3 class="font-semibold text-gray-900 mb-1">${planData.titolo || 'Materiale caricato'}</h3>
-                            <div class="flex items-center gap-2 text-xs text-gray-500">
-                                <span>Ultima attività: ${planData.lastAccessed || 'oggi'}</span>
-                                <span>•</span>
-                                <span>${flashcardCount} flashcard</span>
-                                <span>•</span>
-                                <span>${quizCount} quiz</span>
-                            </div>
-                        </div>
-                        <div class="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-bold">
-                            ${planData.mastery || 45}% padronanza
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <button class="hover:cursor-pointer px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-semibold hover:bg-indigo-700">
-                            Studia
-                        </button>
-                        <button class="hover:cursor-pointer px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-xs font-semibold hover:bg-gray-200">
-                            Ripassa
-                        </button>
-                        <button class="hover:cursor-pointer px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-xs font-semibold hover:bg-gray-200">
-                            Quiz
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-function populateTimeline(timeline) {
-    const container = document.querySelector('[class*="Piano Studio"]')?.parentElement;
-    if (!container || !timeline.length) return;
-    
-    let html = '<h2 class="text-lg font-bold text-gray-900 mb-4">📅 Piano Studio</h2><div class="space-y-3">';
-    
-    timeline.slice(0, 3).forEach((session, i) => {
-        const borderColor = i === 0 ? 'indigo' : 'gray';
-        html += `
-            <div class="border-l-4 border-${borderColor}-500 pl-4 py-2">
-                <p class="text-sm font-bold text-${borderColor}-600">${session.dayLabel || 'Giorno ' + (i + 1)}</p>
-                <p class="font-semibold text-gray-900">${session.title}</p>
-                <p class="text-sm text-gray-600">${session.duration} min • ${session.items || (session.quizCount || 0) + (session.flashcardCount || 0)} elementi</p>
-            </div>
-        `;
-    });
-    
-    html += '</div>';
-    
-    const targetDiv = container.querySelector('.space-y-3');
-    if (targetDiv) {
-        targetDiv.innerHTML = html;
-    }
-}
+                    <span>Indietro</span>
+                </button>`
+})

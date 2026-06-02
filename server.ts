@@ -724,6 +724,10 @@ app.post("/api/create-ai-plane", upload.single("file"), async function(req, res)
 
             "strategy": "es: Spaced Repetition + Quiz Mirati",
 
+            "mastery": numero,
+            "lastAccessed": "es: oggi",
+            "streak": numero,
+
             "timeline": [
                 {
                 "day": "Oggi",
@@ -779,6 +783,8 @@ app.post("/api/create-ai-plane", upload.single("file"), async function(req, res)
                 "title": "Titolo azione",
                 "description": "spiegazione breve",
                 "duration": "es: 15 minuti",
+                "type": "quiz | flashcard | mixed",
+                "priority": "Alta | Media | Bassa",
                 "questions": numero,
                 "difficulty": "Facile | Intermedia | Difficile"
             }
@@ -924,7 +930,7 @@ app.post("/api/saveStudyData", async function(req, res) {
         const flashcardsToSave = flashcardsArray.map((f:any) => ({
             ...f,
             materialId: materialId,
-            userId: userId
+            userId:  new ObjectId(userId)
         }));
         
         if (flashcardsToSave.length > 0) {
@@ -982,27 +988,31 @@ app.use("/api", function(req:any,res,next){
     }
 })
 
-app.get("/api/getPlan",async function(req,res,next){
-    const id:any = req.query.id
-    const client = new MongoClient(connectionString!)
-    await client.connect().catch(function(err){
-        res.status(503).send("Errore di connessione al dbms")
-        return
-    })
-    const collection = client.db(dbName).collection("plan")
-    const cmd = collection.findOne({"_id":new ObjectId(id)})
-    cmd.catch(function(err){
-        res.status(500).send("Errore esecuzione query: " + err)
-    })
+app.get("/api/getPlanQuizFlashcard", async function(req, res, next) {
+  const id: any = req.query.id;
+  const client = new MongoClient(connectionString!);
 
-    cmd.then(function(data){
-        res.send(data)
-    })
+  await client.connect().catch(function(err) {
+    res.status(503).send("Errore di connessione al dbms");
+    return;
+  });
 
-    cmd.finally(function(){
-        client.close()
-    })
-})
+  try {
+    const db = client.db(dbName);
+
+    const [plan, quizzes, flashcards] = await Promise.all([
+      db.collection("plan").findOne({ "_id": new ObjectId(id) }),
+      db.collection("quizzes").find({ "userId": id }).toArray(),
+      db.collection("flashcards").find({ "userId": new ObjectId(id) }).toArray()
+    ]);
+
+    res.send({ plan, quizzes, flashcards });
+  } catch(err) {
+    res.status(500).send("Errore esecuzione query: " + err);
+  } finally {
+    client.close();
+  }
+});
 
 // ============================================
 // EXTRACT JSON - VERSIONE SUPER ROBUSTA
