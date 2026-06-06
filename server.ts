@@ -174,6 +174,7 @@ function createToken(data:any){
     const payload = {
         "_id": data._id,
         "username": data.username,
+        "nome":data.nome,
         "iat": data.iat || now,
         "exp": now + parseInt(process.env.durata_token!)
     }
@@ -213,11 +214,8 @@ app.post("/api/registrazione",async function(req,res,next){
     })
 
     cmd.then(function(data){
-        const token = createToken({
-            "_id":data.insertedId,
-            "email":email
-        })
-        res.cookie("token",token,cookiesOption)
+        const token = createToken(data)
+        res.cookie("TOKEN",token,cookiesOption)
         console.log("Cookie: ", res.getHeader("set-cookie"))
         res.send({"_id":data.insertedId, "nome":nome})
     })
@@ -681,127 +679,100 @@ app.post("/api/create-ai-plane", upload.single("file"), async function(req, res)
         const allFlashcards = flashcardResults.flat();
         const allQuizzes = quizResults.flat();
 
-        sendEvent(3, 96, "Generazione piano di studio AI...");
+        sendEvent(3, 90, "Generazione piano di studio AI...");
 
         let studyPlanData = null;
 
         try {
-           const planPrompt = 
-           `Sei un tutor AI esperto di apprendimento efficace.
+            const planPrompt = `
+            Sei un sistema esperto di didattica. Il tuo compito è generare un piano di studio completo e bilanciato basato sul TESTO FORNITO.
 
-            Analizza il testo e genera una diagnosi completa + piano di studio strutturato per una dashboard interattiva.
-
-            TESTO:
+            TESTO DA ANALIZZARE:
+            """
             ${chunks}
+            """
 
-            OBIETTIVO:
-            Restituisci un JSON COMPLETO per popolare una dashboard moderna (diagnosi + piano + timeline + next action).
-            IL TEMPO STIMATO DI STUDIO DEVE ESSERE REALISTICO
+            REGOLE RIGOROSE:
+            1. COMPOSIZIONE PIANO (TIMELINE):
+            - Il piano dovrebbe includere tutte e 4 le tipologie di attività: 'studio', 'flashcard', 'quiz', 'exam'.
+            - Struttura la timeline in modo logico: inizia con 'studio', prosegue con 'flashcard', approfondisce con 'quiz' e conclude con 'exam' per esempio.
+            - Puoi generare da 4 a 6 step totali. Se il testo è lungo, aggiungi step di 'studio' extra.
 
-            FORMATO JSON OBBLIGATORIO (NESSUN testo extra):
+            2. SPECIFICHE ATTIVITÀ:
+            - Ogni step deve avere: day, title, description, duration, type, difficulty, priority.
+            - SE tipo è 'studio' o 'mixed': includi 'content' con il TESTO INTEGRALE ORIGINALE (usa tag HTML <h3>, <p>, <code>).
+            - SE tipo è 'quiz': includi 'quizList' (vettore di oggetti: {"question": "...", "options": ["A", "B", "C", "D"], "correct": 0}).
+            - SE tipo è 'flashcard': includi 'flashcardList' (vettore di oggetti: {"front": "...", "back": "..."}).
 
+            3. NEXT ACTION:
+            - Imposta 'nextAction' come: { "title": "titolo_del_primo_step" }.
+
+            4. FORMATO JSON (STRUTTURA OBBLIGATORIA):
             {
-            "documentName": "Nome breve documento",
-
-            "topics": ["argomento1", "argomento2", "argomento3"],
-
+            "documentName": "Nome breve",
+            "topics": ["argomento1", "argomento2"],
             "difficulty": "Facile | Intermedia | Difficile",
-            "difficultyReason": "breve spiegazione",
-
+            "difficultyReason": "Giustificazione basata sul contenuto",
             "estimatedTime": "es: 6 ore",
-
-            "stats": {
-                "pagesAnalyzed": numero,
-                "keywords": numero,
-                "sessions": "es: 8-12",
-                "completion": "es: 7-10 giorni"
-            },
-
-            "risk": {
-                "level": "Basso | Medio | Alto",
-                "message": "spiegazione semplice"
-            },
-
-            "strategy": "es: Spaced Repetition + Quiz Mirati",
-
-            "mastery": numero,
-            "lastAccessed": "es: oggi",
-            "streak": numero,
-
+            "stats": { "pagesAnalyzed": 0, "sessions": "4-6", "completion": "X giorni" },
+            "risk": { "level": "Basso | Medio | Alto", "message": "Punto critico" },
+            "strategy": "Active Recall e Spaced Repetition",
+            "mastery": 0,
             "timeline": [
                 {
-                "day": "Oggi",
-                "title": "Titolo breve",
-                "description": "cosa fare",
-                "duration": "es: 15 minuti",
-                "type": "quiz | flashcard | mixed",
-                "quizCount": numero,
-                "flashcardCount": numero,
-                "difficulty": "Facile | Intermedia | Difficile",
-                "priority": "Alta | Media | Bassa",
-                "successRate": numero (0-100)
-                },
-                {
-                "day": "Domani",
-                "title": "Titolo",
-                "description": "descrizione",
-                "duration": "es: 20 minuti",
-                "type": "quiz | flashcard | mixed",
-                "quizCount": numero,
-                "flashcardCount": numero,
-                "difficulty": "Facile | Intermedia | Difficile",
-                "priority": "Media",
-                "successRate": numero
-                },
-                {
-                "day": "Tra 2 giorni",
-                "title": "Titolo",
-                "description": "descrizione",
-                "duration": "es: 30 minuti",
-                "type": "mixed",
-                "quizCount": numero,
-                "flashcardCount": numero,
-                "difficulty": "Intermedia",
-                "priority": "Media",
-                "successRate": numero
-                },
-                {
-                "day": "Tra 7 giorni",
-                "title": "Esame simulato",
-                "description": "test completo",
-                "duration": "es: 45 minuti",
-                "type": "exam",
-                "quizCount": numero,
-                "flashcardCount": 0,
-                "difficulty": "Difficile",
-                "priority": "Alta",
-                "successRate": numero
+                "day": "...",
+                "title": "...",
+                "description": "...",
+                "duration": "...",
+                "type": "studio | flashcard | quiz | exam",
+                "content": "TESTO INTEGRALE O VUOTO",
+                "quizList": [ ... ],
+                "flashcardList": [ ... ]
                 }
             ],
-
-            "nextAction": {
-                "title": "Titolo azione",
-                "description": "spiegazione breve",
-                "duration": "es: 15 minuti",
-                "type": "quiz | flashcard | mixed",
-                "priority": "Alta | Media | Bassa",
-                "questions": numero,
-                "difficulty": "Facile | Intermedia | Difficile"
-            }
+            "nextAction": { "title": "..." }
             }
 
-            REGOLE IMPORTANTI:
-            - 3-6 topic massimo
-            - timeline di 3-4 step (non di più)
-            - numeri realistici
-            - linguaggio semplice
-            - coerente con il testo
-            - niente testo fuori dal JSON
-            - JSON valido al 100%`
+            IMPORTANTE: Restituisci ESCLUSIVAMENTE un oggetto JSON valido. Non inserire markdown, non aggiungere spiegazioni testuali prima o dopo il blocco JSON.
+            `;
             
             const planResult = await generateWithRetry(planPrompt, 'plan');
             
             studyPlanData = planResult;
+
+            for (let step of studyPlanData.timeline) {
+            // Inizializza forzatamente come stringa vuota se non esiste
+            step.content = ""; 
+
+            if (step.type === 'studio' || step.type === 'mixed') {
+                sendEvent(3, 92, `Estrazione contenuto per: ${step.title}...`);
+                
+                const extractionPrompt = `
+                Sei un curatore di contenuti. 
+                TESTO ORIGINALE: ${extractedTextFromPdf}
+                ARGOMENTO DA ESTRARRE: ${step.title}
+                
+                ISTRUZIONE: 
+                Estrai dal testo originale TUTTO il contenuto pertinente a questo argomento. 
+                NON RIASSUMERE. NON ELENCARE. Copia il testo integrale, includendo codice ed esempi.
+                Formattalo SOLO con tag HTML (<h3>, <p>, <code>, <ul>, <li>).
+                
+                RISPONDI SOLO CON IL TESTO HTML. NON AGGIUNGERE ALTRO TESTO.`;
+
+                // USIAMO LA FUNZIONE RAW
+                const contentHtml = await generateRawContent(extractionPrompt);
+                step.content = contentHtml;
+            }
+        }
+
+        // 3. AGGIORNAMENTO NEXT ACTION (Sincronizzazione finale)
+        const firstActive = studyPlanData.timeline.find((s:any) => s.type === 'studio' || s.type === 'mixed');
+        if (firstActive) {
+            studyPlanData.nextAction = {
+                ...firstActive, // Prende il contenuto appena popolato
+                priority: "Alta"
+            };
+        }
             
             console.log('✅ Study plan generated');
         } catch (error: any) {
@@ -916,11 +887,11 @@ app.post("/api/saveStudyData", async function(req, res) {
 
         // --- OPERAZIONE 1: Salva il Materiale (Il "Contenitore") ---
         const materialResult = await db.collection("plan").insertOne({
-            _id: new ObjectId(userId),
             titolo: plan.documentName || "Nuovo Materiale",
             pianoStudio: plan,
             testoEstratto: extractedText,
-            dataCreazione: new Date()
+            dataCreazione: new Date(),
+            userId: new ObjectId(userId)
         });
 
         const materialId = materialResult.insertedId;
@@ -941,7 +912,7 @@ app.post("/api/saveStudyData", async function(req, res) {
         const quizToSave = quizArray.map((q:any) => ({
             ...q,
             materialId: materialId,
-            userId: userId
+            userId:  new ObjectId(userId)
         }));
 
         if (quizToSave.length > 0) {
@@ -951,7 +922,8 @@ app.post("/api/saveStudyData", async function(req, res) {
         // Risposta di successo
         res.status(200).send({
             message: "Tutto salvato con successo!",
-            materialId: materialId
+            materialId: materialId,
+            titoloMateriale:plan.documentName
         });
 
     } catch (err:any) {
@@ -980,7 +952,7 @@ app.use("/api", function(req:any,res,next){
                 //serve a fare in modo che il tempo di scadenza del token sia
                 //aggiornato ricreando il token
                 const newToken = createToken(payload)
-                res.cookie("token",newToken,cookiesOption)
+                res.cookie("TOKEN",newToken,cookiesOption)
                 req["username"] = payload.username
                 next()
             }
@@ -990,6 +962,7 @@ app.use("/api", function(req:any,res,next){
 
 app.get("/api/getPlanQuizFlashcard", async function(req, res, next) {
   const id: any = req.query.id;
+  const title:string = req.query.title as string
   const client = new MongoClient(connectionString!);
 
   await client.connect().catch(function(err) {
@@ -1001,8 +974,8 @@ app.get("/api/getPlanQuizFlashcard", async function(req, res, next) {
     const db = client.db(dbName);
 
     const [plan, quizzes, flashcards] = await Promise.all([
-      db.collection("plan").findOne({ "_id": new ObjectId(id) }),
-      db.collection("quizzes").find({ "userId": id }).toArray(),
+      db.collection("plan").findOne({ "userId": new ObjectId(id), "titolo":title }),
+      db.collection("quizzes").find({ "userId": new ObjectId(id) }).toArray(),
       db.collection("flashcards").find({ "userId": new ObjectId(id) }).toArray()
     ]);
 
@@ -1013,6 +986,67 @@ app.get("/api/getPlanQuizFlashcard", async function(req, res, next) {
     client.close();
   }
 });
+
+app.patch("/api/cambiaNextAction", async function(req, res, next) {
+  const title: any = req.body.title;
+  const userId:any = req.body.userId
+  const client = new MongoClient(connectionString!);
+
+  await client.connect().catch(function(err) {
+    res.status(503).send("Errore di connessione al dbms");
+    return;
+  });
+
+    const db = client.db(dbName)
+    const collection = client.db(dbName).collection("plan")
+    const cmd = collection.findOne({userId:new ObjectId(userId),titolo:title})
+
+    cmd.then(function(data){
+        //res.send(data)
+        console.log(data)
+        const plan:any = data
+        const currentIndex = plan?.pianoStudio.timeline.findIndex((s:any) => s.title === plan.pianoStudio.nextAction.title);
+        const isLastAction = plan.pianoStudio.timeline.length - 1 == currentIndex
+        console.log(currentIndex)
+        console.log(isLastAction)
+
+        const nextStep = plan?.pianoStudio.timeline[currentIndex + 1];
+
+        // 4. Aggiorna la nextAction usando SOLO il titolo come puntatore
+        plan.pianoStudio.nextAction = nextStep
+
+        // 5. Salva nel DB (modifica con il tuo metodo di salvataggio)
+        const cmdUpdate = collection.updateOne({userId:new ObjectId(userId)},{$set:{"pianoStudio.nextAction":plan.pianoStudio.nextAction}})
+
+        cmdUpdate.then(function(data){
+            console.log(data)
+            res.send({ 
+            success: true, 
+            nextAction: plan.pianoStudio.nextAction,
+            fullDetails: nextStep, // Inviamo anche i dettagli per aggiornare la UI
+            isLastAction,
+            titoloDocumento:title
+        });
+        })
+
+        cmdUpdate.catch(function(err){
+            res.status(500).send("Errore esecuzione 2 query: " + err)
+        })
+
+        cmdUpdate.finally(function(){
+            client.close()
+        })
+    })
+
+    cmd.catch(function(err){
+        res.status(500).send("Errore esecuzione query: " + err)
+    })
+});
+
+app.get("/api/checkToken",async function(req,res,next){
+    console.log(req.cookies)
+    res.send({"token":req.cookies.TOKEN})
+})
 
 // ============================================
 // EXTRACT JSON - VERSIONE SUPER ROBUSTA
@@ -1292,6 +1326,22 @@ async function generateWithRetry(
         }
     }
     return type === 'plan' ? null : [];
+}
+
+// Aggiungi questa funzione nel tuo file
+async function generateRawContent(prompt:any) {
+    // Qui devi chiamare il tuo provider AI (es. OpenAI/Anthropic)
+    // L'importante è che NON esegua JSON.parse() sul risultato
+    const response = await genAI.models.generateContent({
+                model: "gemini-flash-lite-latest",
+                contents: prompt,
+                config: {
+                    temperature: 0.2,
+                    topP: 0.8,
+                    topK: 40
+                }
+            });
+    return response.text?.trim(); // Restituisce solo la stringa, niente parser
 }
 
 app.use("/",function(req,res,next){

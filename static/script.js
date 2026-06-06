@@ -8,6 +8,8 @@ let currentIndex = 0;
 let isFlipped = false;
 let viewMode = "single";
 let dataToSave
+let quizPlanFlashcard
+let currentPlan
 const googleClientId = "99632147794-fuhq76pci5hk7dh2uglkeddcs7fjqjpc.apps.googleusercontent.com";
 
 // ============================================
@@ -758,9 +760,7 @@ function caricaDatiFlashcard(){
     renderCard();
 }
 
-function caricaDatiQuiz() {
-    const quizData = quizGlobal;
-
+function caricaDatiQuiz(quizData = quizGlobal) {
     let currentQuestion = 0;
     let score = 0;
     let answered = false;
@@ -781,14 +781,11 @@ function caricaDatiQuiz() {
     if (quizMainCard) quizMainCard.classList.remove("hidden");
     if (resultEl) resultEl.classList.add("hidden");
 
-    console.log(answersEl)
-
     totalEl.textContent = "/ " + quizData.length;
 
     function renderQuestion() {
 
         const q = quizData[currentQuestion];
-        console.log(q)
 
         answered = false;
         feedbackEl.classList.add("hidden");
@@ -806,7 +803,6 @@ function caricaDatiQuiz() {
             btn.className =
                 "quiz-option hover:cursor-pointer w-full rounded-xl border border-gray-200 bg-white px-6 py-4 text-left text-gray-700 font-medium transition hover:border-purple-500 hover:bg-purple-50";
             btn.textContent = answer;
-            console.log(answer)
             btn.onclick = () => {
 
                 if (answered) return;
@@ -836,7 +832,6 @@ function caricaDatiQuiz() {
                 }
                 feedbackEl.classList.remove("hidden");
             };
-            console.log(btn)
             answersEl.appendChild(btn);
         });
     }
@@ -1616,14 +1611,51 @@ function completeOnboarding() {
 // RESULTS PAGE FUNCTIONS
 // ============================================
 
-function startStudying() {
+async function startStudying() {
     // Nascondi results, mostra dashboard
     resultsPage.classList.add('hidden');
-    authSection.classList.remove('hidden');
-    loginForm.classList.add("hidden")
-    signupForm.classList.remove("hidden")
-    authSectionWelcome.textContent = "Benvenuto"
-    authSectionLogin.textContent = "Registrati"
+    const response = await inviaRichiesta("GET","/checkToken")
+    if(response.status == 200){
+        const token = response.data.token
+        console.log(token)
+        const userData = parseJwt(token)
+        console.log(userData)
+        showDashboardAndPopolIt(userData)
+        return
+    }
+    if(response.status == 403){
+        authSection.classList.remove('hidden');
+        loginForm.classList.add("hidden")
+        signupForm.classList.remove("hidden")
+        authSectionWelcome.textContent = "Benvenuto"
+        authSectionLogin.textContent = "Registrati"
+        return
+    }
+    console.log(response.status + " : " + response.err)
+}
+
+function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    console.log(value)
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+}
+
+function parseJwt(token) {
+    try {
+        // Il payload è la seconda parte del token
+        const base64Url = token.split('.')[1];
+        // Decodifica Base64
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+
+        return JSON.parse(jsonPayload);
+    } catch (e) {
+        console.error("Token non valido", e);
+        return null;
+    }
 }
 
 function showFlashcards() {
@@ -1670,24 +1702,7 @@ function handleGoogleAuth(){
                     console.log(apiResponse.data)
                     authSection.classList.add('hidden');
                     signupForm.classList.add("hidden")
-                    dashboard.classList.remove("hidden")
-                    spanIniziale.textContent = apiResponse.data.nome[0].toUpperCase()
-                    dataToSave["userId"] = apiResponse.data._id
-                    const responseSavement = await inviaRichiesta("POST","/saveStudyData",dataToSave)
-                    if(responseSavement.status == 200){
-                        console.log(responseSavement.data)
-                        const getPlanResponse = await inviaRichiesta("GET","/getPlanQuizFlashcard",{"id":apiResponse.data._id})
-                        if(getPlanResponse.status == 200){
-                            console.log(getPlanResponse.data)
-                            quizGlobal = getPlanResponse.data.quizzes
-                            flashcardGlobal = getPlanResponse.data.flashcards
-                            popolaDashboard(getPlanResponse.data)
-                        }
-                        else
-                            console.log("Errore: " ,getPlanResponse.err)
-                    }
-                    else
-                        console.log("Errore: " ,responseSavement.err)
+                    showDashboardAndPopolIt(apiResponse.data)
                 }
                 else{
                     if(apiResponse.status == 400)
@@ -1701,8 +1716,33 @@ function handleGoogleAuth(){
     client.requestAccessToken();
 }
 
+async function showDashboardAndPopolIt(data){
+    dashboard.classList.remove("hidden")
+    spanIniziale.textContent = data.nome[0].toUpperCase()
+    dataToSave["userId"] = data._id
+    const responseSavement = await inviaRichiesta("POST","/saveStudyData",dataToSave)
+    if(responseSavement.status == 200){
+        console.log(responseSavement.data)
+        const getPlanResponse = await inviaRichiesta("GET","/getPlanQuizFlashcard",{"id":data._id,"title":responseSavement.data.titoloMateriale})
+        if(getPlanResponse.status == 200){
+            console.log(getPlanResponse.data)
+            quizGlobal = getPlanResponse.data.quizzes
+            flashcardGlobal = getPlanResponse.data.flashcards
+            popolaDashboard(getPlanResponse.data)
+            currentPlan = getPlanResponse.data.plan
+        }
+        else
+            console.log("Errore: " ,getPlanResponse.err)
+    }
+    else
+        console.log("Errore: " ,responseSavement.err)
+}
+
 function popolaDashboard(data) {
   console.log(data)
+  quizPlanFlashcard = data
+  quizGlobal = data.quizzes
+  flashcardGlobal = data.flashcards
   const plan = data.plan
   nextActionTitle.textContent = plan.pianoStudio.nextAction.title
   nextActionDescription.textContent = plan.pianoStudio.nextAction.description
@@ -1729,13 +1769,45 @@ startQuiz.addEventListener("click",function(){
     dashboard.classList.add("hidden")
     quizSection.classList.remove("hidden")
     caricaDatiQuiz()
+    aggiungiBtnQuiz()
+})
+
+function aggiungiBtnQuiz(textContent = "Torna indietro"){
     goToAIFromQuiz.remove()
-    backToFlashcards.remove()
+    if(document.getElementById("backToFlashcards"))
+        backToFlashcards.remove()
     const btnBack = document.createElement("button")
-    btnBack.textContent = "Torna indietro"
-    btnBack.addEventListener("click",function(){
+    btnBack.textContent = textContent
+    
+    btnBack.addEventListener("click",async function(){
         dashboard.classList.remove("hidden")
         quizSection.classList.add("hidden")
+        if(textContent == "Continua"){
+            const response = await inviaRichiesta("PATCH","/cambiaNextAction",{"title":currentPlan.titolo,
+            "userId":currentPlan.userId
+            })
+            if(response.status == 200){
+                console.log(response.data)
+                if(!response.data.isLastAction){
+                    const getPlanResponse = await inviaRichiesta("GET","/getPlanQuizFlashcard",{"id":dataToSave["userId"], "title":response.data.titoloDocumento})
+                    if(getPlanResponse.status == 200){
+                        console.log(getPlanResponse.data)
+                        quizGlobal = getPlanResponse.data.quizzes
+                        flashcardGlobal = getPlanResponse.data.flashcards
+                        popolaDashboard(getPlanResponse.data)
+                        currentPlan = getPlanResponse.data.plan
+                        }
+                    else
+                        console.log("Errore: " ,getPlanResponse.err)
+                }
+                else{
+                    dashboard.classList.add("hidden")
+                    congratulationsSection.classList.remove("hidden")
+                }
+            }
+            else
+                console.log(response.status + " : " + response.err)
+        }
     })
     const classiDaAggiungere = [
         "hover:cursor-pointer",
@@ -1751,22 +1823,44 @@ startQuiz.addEventListener("click",function(){
 
     btnBack.classList.add(...classiDaAggiungere);
     quizSectionBtns.appendChild(btnBack)
-    
-})
+}
 
 startFlashcard.addEventListener("click",function(){
     dashboard.classList.add("hidden")
     flashcardsSection.classList.remove("hidden")
     caricaDatiFlashcard()
+    aggiungiBtnFlashcard()
+})
 
+function aggiungiBtnFlashcard(textContent = "Torna indietro"){
     goToQuiz.remove()
     goToAI.remove()
 
     const btnBackFlashcard = document.createElement("button")
-    btnBackFlashcard.textContent = "Torna indietro"
-    btnBackFlashcard.addEventListener("click",function(){
+    btnBackFlashcard.textContent = textContent
+    btnBackFlashcard.addEventListener("click",async function(){
         dashboard.classList.remove("hidden")
         flashcardsSection.classList.add("hidden")
+        if(textContent == "Continua"){
+            const response = await inviaRichiesta("PATCH","/cambiaNextAction",{"title":currentPlan.titolo,
+            "userId":currentPlan.userId
+            })
+            if(response.status == 200){
+                const getPlanResponse = await inviaRichiesta("GET","/getPlanQuizFlashcard",{"id":dataToSave["userId"],"title":response.data.titoloDocumento})
+            if(getPlanResponse.status == 200){
+                console.log(getPlanResponse.data)
+                quizGlobal = getPlanResponse.data.quizzes
+                flashcardGlobal = getPlanResponse.data.flashcards
+                popolaDashboard(getPlanResponse.data)
+                currentPlan = getPlanResponse.data.plan
+            }
+            else
+                console.log("Errore: " ,getPlanResponse.err)
+            }
+            else
+                console.log(response.status + " : " + response.err)
+        }
+
     })
     const classiDaAggiungere = [
         "hover:cursor-pointer",
@@ -1782,7 +1876,7 @@ startFlashcard.addEventListener("click",function(){
 
     btnBackFlashcard.classList.add(...classiDaAggiungere);
     fatherDivFlashcardBtns.appendChild(btnBackFlashcard)
-})
+}
 
 btnNavigateToChat.addEventListener("click",function(){
     dashboard.classList.add("hidden")
@@ -1798,3 +1892,97 @@ btnNavigateToChat.addEventListener("click",function(){
                     <span>Indietro</span>
                 </button>`
 })
+
+function startNextAction(){
+    dashboard.classList.add("hidden")
+    const action = quizPlanFlashcard.plan.pianoStudio.nextAction;
+    
+    switch(action.type) {
+        case 'quiz':
+            quizSection.classList.remove("hidden")
+            caricaDatiQuiz(quizPlanFlashcard.plan.pianoStudio.nextAction.quizList)
+            aggiungiBtnQuiz("Continua")
+            break;
+        case 'studio':
+            renderStudyView(action);
+            break;
+        case 'flashcard':
+            flashcardsSection.classList.remove("hidden")
+            caricaDatiFlashcard()
+            aggiungiBtnFlashcard("Continua")
+            break
+        case 'exam':
+            quizSection.classList.remove("hidden")
+            caricaDatiQuiz()
+            aggiungiBtnQuiz("Continua")
+            break
+        default:
+            return
+    }
+}
+
+function renderStudyView(action) {
+    const section = document.getElementById('studySection');
+    const titleEl = document.getElementById('studyTitle');
+    const contentEl = document.getElementById('studyContent');
+
+    // 1. Popolamento dinamico
+    titleEl.textContent = action.title;
+    
+    // Inseriamo la descrizione e i metadati, seguiti dal TESTO INTEGRALE estratto dall'AI
+    contentEl.innerHTML = `
+        <p class="text-gray-600 mb-6 italic">${action.description}</p>
+
+        <div class="pdf-content-container">
+            ${action.content}
+        </div>
+    `;
+
+    // 2. Mostra la sezione
+    section.classList.remove("hidden");
+    
+    // 3. Scroll automatico all'inizio del contenuto
+    section.scrollIntoView({ behavior: 'smooth' });
+}
+
+function backToDashboard(){
+    dashboard.classList.remove("hidden")
+    learningSection.classList.add("hidden")
+}
+
+async function markStudyAsComplete(){
+    studySection.classList.add("hidden")
+    dashboard.classList.remove("hidden")
+
+    const response = await inviaRichiesta("PATCH","/cambiaNextAction",{"title":currentPlan.titolo,
+        "userId":currentPlan.userId
+    })
+    if(response.status == 200){
+        console.log(response.data)
+        if(!response.data.isLastAction){
+            const getPlanResponse = await inviaRichiesta("GET","/getPlanQuizFlashcard",{"id":dataToSave["userId"], "title":response.data.titoloDocumento})
+            if(getPlanResponse.status == 200){
+                console.log(getPlanResponse.data)
+                quizGlobal = getPlanResponse.data.quizzes
+                flashcardGlobal = getPlanResponse.data.flashcards
+                popolaDashboard(getPlanResponse.data)
+                currentPlan = getPlanResponse.data.plan
+            }
+            else
+                console.log("Errore: " ,getPlanResponse.err)
+        }
+        else{
+            dashboard.classList.add("hidden")
+            congratulationsSection.classList.remove("hidden")
+        }
+    }
+    else
+        console.log(response.status + " : " + response.err)
+}
+
+function showUploadForm(){
+    congratulationsSection.classList.add("hidden")
+    onboardingSection.classList.remove("hidden")
+    step0.classList.remove("hidden")
+    processingUpdates.innerHTML = ""
+}
