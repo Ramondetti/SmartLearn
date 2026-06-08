@@ -24,6 +24,14 @@ mobileMenuBtn.addEventListener('click', () => {
   mobileMenu.classList.toggle('hidden');
 });
 
+btnNuovoPiano.addEventListener("mouseover", function() {
+    this.style.backgroundColor = "#15803d"; // Verde più scuro
+});
+
+btnNuovoPiano.addEventListener("mouseout", function() {
+    this.style.backgroundColor = "#16a34a"; // Verde originale
+});
+
 // ============================================
 // Navbar Scroll Effect
 // ============================================
@@ -394,14 +402,103 @@ goToAIFromQuiz.addEventListener("click", function() {
     }
 });
 
-/*backToResultsFromAI.addEventListener("click", function() {
-    backToResultsFromAIFunction("sezioneResults")
-});*/
-
 showSectionStartNav.addEventListener("click",function(){
     homepage.classList.add("hidden")
     authSection.classList.remove("hidden")
+    containerBtnLoginGoogle.innerHTML = `
+    <button id="btnGoogle" onclick="loginWithGoogle()" class="hover:cursor-pointer w-full flex items-center justify-center gap-2.5 px-4 py-2.5 border-2 border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all group">
+        <svg class="w-4 h-4" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+        </svg>
+        <span class="text-sm font-medium text-gray-700 group-hover:text-gray-900">Continua con Google</span>
+    </button>
+    `
 })
+
+function loginWithGoogle(){
+    const client = google.accounts.oauth2.initTokenClient({
+        client_id: googleClientId,
+        scope: 'email profile',
+        callback: async (response) => {
+            if (response.access_token) {
+                // 2. Invia il token al TUO backend
+                const apiResponse = await inviaRichiesta("POST","/loginWithGoogle",{"googleToken": response.access_token })
+                if(apiResponse.status == 200){
+                    console.log(apiResponse.data)
+                    authSection.classList.add('hidden');
+                    pianiSection.classList.remove("hidden")
+                    getAndAddPlans(apiResponse.data._id)
+                }
+                else{
+                    if(apiResponse.status == 400)
+                        msgErroreLogin.classList.remove("hidden")
+                    else
+                        console.log(apiResponse.status + " : " + apiResponse.err)
+                }
+            }
+        },
+    });
+    client.requestAccessToken();
+}
+
+async function getAndAddPlans(userId) {
+    const response = await inviaRichiesta("GET", "/getPlans", { userId });
+    
+    if (response.status === 200) {
+        console.log(response.data);
+        listaPiani.innerHTML = ""; // Svuota il contenitore prima di ripopolare
+        const piani = response.data;
+
+        piani.forEach(function(json, i) {
+            const card = document.createElement("div");
+            // Applichiamo classi diverse se è active o archiviato
+            card.className = `p-4 rounded-xl border ${json.plan.status === 'active' ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 bg-white'}`;
+            
+            // Definiamo il bottone solo se attivo
+            const isAttivo = json.plan.status === 'active';
+            const bottoneHtml = isAttivo 
+                ? `<button id="btnVisualizzaPiano-${i}" class="hover:cursor-pointer px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 transition">
+                       Continua Piano
+                   </button>` 
+                : "";
+
+            card.innerHTML = `
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h3 class="font-bold text-lg">${json.plan.titolo}</h3>
+                        <p class="text-sm text-gray-600">Status: ${json.plan.status}</p>
+                    </div>
+                    <div class="flex flex-col gap-2 items-end">
+                        <span class="px-3 py-1 ${isAttivo ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-600'} text-xs rounded-full">
+                            ${isAttivo ? 'In corso' : 'Archiviato'}
+                        </span>
+                        ${bottoneHtml}
+                    </div>
+                </div>
+            `;
+            
+            listaPiani.appendChild(card);
+
+            // Aggiungiamo il listener solo se il bottone è stato effettivamente creato
+            if (isAttivo) {
+                document.querySelector("#btnVisualizzaPiano-" + i).addEventListener("click", function() {
+                    pianiSection.classList.add("hidden");
+                    dashboard.classList.remove("hidden");
+                    
+                    currentPlan = json.plan;
+                    dataToSave = { userId: json.plan.userId };
+                    
+                    popolaDashboard(json);
+                });
+            }
+        });
+    } else {
+        console.error("Errore nel recupero piani: " + response.status + " : " + response.err);
+    }
+}
 
 showSectionStartMobile.addEventListener("click",function(){
     homepage.classList.add("hidden")
@@ -474,16 +571,40 @@ async function handleLogin(event){
         if(httResponse.status == 200){
             console.log(httResponse.data)
             authSection.classList.add("hidden")
-            dashboard.classList.remove("hidden")
-            spanIniziale.textContent = httResponse.data.nome[0].toUpperCase()
+            pianiSection.classList.remove("hidden")
+            getAndAddPlans(httResponse.data._id)
         }
         else{
             if(httResponse.status == 401)
                 msgErroreLogin.classList.remove("hidden")
             else
-                alert(httResponse.status + " : " + httResponse.err)
+                console.error(httResponse.status + " : " + httResponse.err)
         }
 }
+
+btnNuovaPassword.addEventListener("click",function(){
+    authSection.classList.add("hidden")
+    resetPasswordSection.classList.remove("hidden")
+})
+
+btnAnnullaReset.addEventListener("click",function(){
+    authSection.classList.remove("hidden")
+    resetPasswordSection.classList.add("hidden")
+})
+
+btnInviaReset.addEventListener("click",async function(){
+    const response = await inviaRichiesta("POST","/passwordDimenticata",{"email":emailReset.value})
+    if(response.status == 200){
+        console.log(response.data)
+    }
+    else
+        console.error(response.status + " : " + response.err)
+})
+
+btnNuovoPiano.addEventListener("click",function(){
+    pianiSection.classList.add("hidden")
+    showUploadForm()
+})
 
 async function handleSignup(event){
     event.preventDefault()
@@ -1697,7 +1818,7 @@ function handleGoogleAuth(){
         callback: async (response) => {
             if (response.access_token) {
                 // 2. Invia il token al TUO backend
-                const apiResponse = await inviaRichiesta("POST","/loginWithGoogle",{"googleToken": response.access_token })
+                const apiResponse = await inviaRichiesta("POST","/signUpWithGoogle",{"googleToken": response.access_token })
                 if(apiResponse.status == 200){
                     console.log(apiResponse.data)
                     authSection.classList.add('hidden');
@@ -1723,7 +1844,8 @@ async function showDashboardAndPopolIt(data){
     const responseSavement = await inviaRichiesta("POST","/saveStudyData",dataToSave)
     if(responseSavement.status == 200){
         console.log(responseSavement.data)
-        const getPlanResponse = await inviaRichiesta("GET","/getPlanQuizFlashcard",{"id":data._id,"title":responseSavement.data.titoloMateriale})
+        const getPlanResponse = await inviaRichiesta("GET","/getPlanQuizFlashcard",{"id":data._id,"title":responseSavement.data.titoloMateriale,
+             "materialId":responseSavement.data.materialId})
         if(getPlanResponse.status == 200){
             console.log(getPlanResponse.data)
             quizGlobal = getPlanResponse.data.quizzes
@@ -1789,7 +1911,9 @@ function aggiungiBtnQuiz(textContent = "Torna indietro"){
             if(response.status == 200){
                 console.log(response.data)
                 if(!response.data.isLastAction){
-                    const getPlanResponse = await inviaRichiesta("GET","/getPlanQuizFlashcard",{"id":dataToSave["userId"], "title":response.data.titoloDocumento})
+                    const getPlanResponse = await inviaRichiesta("GET","/getPlanQuizFlashcard",{"id":dataToSave["userId"], "title":response.data.titoloDocumento,
+                        "materialId":response.data.materialId
+                    })
                     if(getPlanResponse.status == 200){
                         console.log(getPlanResponse.data)
                         quizGlobal = getPlanResponse.data.quizzes
@@ -1846,7 +1970,9 @@ function aggiungiBtnFlashcard(textContent = "Torna indietro"){
             "userId":currentPlan.userId
             })
             if(response.status == 200){
-                const getPlanResponse = await inviaRichiesta("GET","/getPlanQuizFlashcard",{"id":dataToSave["userId"],"title":response.data.titoloDocumento})
+                const getPlanResponse = await inviaRichiesta("GET","/getPlanQuizFlashcard",{"id":dataToSave["userId"],"title":response.data.titoloDocumento,
+                    "materialId":response.data.materialId
+                })
             if(getPlanResponse.status == 200){
                 console.log(getPlanResponse.data)
                 quizGlobal = getPlanResponse.data.quizzes
@@ -1960,7 +2086,9 @@ async function markStudyAsComplete(){
     if(response.status == 200){
         console.log(response.data)
         if(!response.data.isLastAction){
-            const getPlanResponse = await inviaRichiesta("GET","/getPlanQuizFlashcard",{"id":dataToSave["userId"], "title":response.data.titoloDocumento})
+            const getPlanResponse = await inviaRichiesta("GET","/getPlanQuizFlashcard",{"id":dataToSave["userId"], "title":response.data.titoloDocumento,
+                "materialId":response.data.materialId
+            })
             if(getPlanResponse.status == 200){
                 console.log(getPlanResponse.data)
                 quizGlobal = getPlanResponse.data.quizzes

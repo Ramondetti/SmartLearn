@@ -143,7 +143,3 @@ animation: l3 1s infinite linear;
     cursor: pointer;
     transition: background-color 0.2s ease;
 }
-
-#backToResultsFromAI:hover {
-    background-color: rgb(243, 244, 246); /* gray-100 */
-}

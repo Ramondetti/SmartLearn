@@ -448,3 +448,7 @@ html {
 .animation-delay-4000 {
     animation-delay: 4s;
 }
+
+#btnNuovoPiano:hover {
+    background-color: #15803d; /* Verde più scuro per l'hover */
+}

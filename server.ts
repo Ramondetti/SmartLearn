@@ -15,6 +15,8 @@ import bcrypt from "bcryptjs"
 import jwt from "jsonwebtoken"
 import cookieParser from "cookie-parser"
 import Tesseract, { createWorker } from 'tesseract.js';
+import nodemailer from "nodemailer"
+import crypto from "crypto"
 
 const app = express()
 dotenv.config({path:".env"})
@@ -22,6 +24,7 @@ const connectionString = process.env.connectionStringLocal
 const dbName = process.env.dbName
 const genAI = new GoogleGenAI({apiKey: process.env.GenAI_KEY!});
 const HTTPS_PORT = process.env.HTTPS_PORT
+const googleOAuth = JSON.parse(process.env.googleOAuth!)
 
 const server = http.createServer(app)
 
@@ -121,7 +124,7 @@ const cookiesOption:CookieOptions = {
     "sameSite":"lax" //i cookie devono essere trasmessi oltre domain
 }
 
-app.post("/api/loginWithGoogle", async function(req, res, next) {
+app.post("/api/signUpWithGoogle", async function(req, res, next) {
     const googleToken = req.body.googleToken;
 
     // 1. Chiediamo a Google i dati dell'utente usando il token
@@ -167,6 +170,168 @@ app.post("/api/loginWithGoogle", async function(req, res, next) {
         await client.close();
     }
 });
+
+app.post("/api/loginWithGoogle", async function(req, res, next) {
+    const googleToken = req.body.googleToken;
+
+    // 1. Validazione del token con Google
+    const googleResponse = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+        headers: { "Authorization": `Bearer ${googleToken}` }
+    });
+
+    if (!googleResponse.ok) {
+        return res.status(401).send("Token Google non valido o scaduto");
+    }
+
+    const payload = await googleResponse.json(); 
+    
+    const client = new MongoClient(connectionString!);
+    try {
+        await client.connect();
+        const collection = client.db(dbName).collection("utenti");
+        
+        // 2. Cerchiamo l'utente nel DB tramite l'email di Google
+        const existingUser = await collection.findOne({ username: payload.email });
+
+        // 3. Se l'utente non esiste, mandiamo un errore
+        if (!existingUser) {
+            return res.status(404).send("Utente non registrato. Esegui prima la registrazione.");
+        }
+
+        // 4. Se esiste, creiamo il token e lo mandiamo come cookie
+        let TOKEN = createToken(existingUser);
+        res.cookie("TOKEN", TOKEN, cookiesOption);
+        
+        // Risposta con i dati dell'utente trovato
+        res.send({ 
+            "ris": "ok", 
+            "_id": existingUser._id, 
+            "username": existingUser.username, 
+            "nome": existingUser.nome 
+        });
+
+    } catch (err) {
+        res.status(500).send("Errore esecuzione: " + err);
+    } finally {
+        await client.close();
+    }
+});
+
+app.post("/api/login", async function(req,res,next){
+    const username = req.body.username
+    const password = req.body.password
+
+    const client = new MongoClient(connectionString!)
+    await client.connect().catch(function(err){
+        res.status(503).send("Errore di connessione al dbms")
+        return
+    })
+
+    const collection = client.db(dbName).collection("utenti")
+
+    const cmd = collection.findOne({ email:username });
+
+    cmd.then(function (dbUser) { // gli inietta l'intero record utente (compresa la password)
+        if (!dbUser)
+            res.status(401).send("Username o password non validi!");
+        else {
+            console.log("Password ricevuta:", password, "Passwors DB:", dbUser.password);
+            bcrypt.compare(password, dbUser.password, function (err, ok) {
+                if (err) {
+                    res.status(500).send("bcrypt execution error");
+                    console.log(err?.stack);
+                }
+                else {
+                    if (!ok)
+                        res.status(401).send("Username o password non validi!")
+                    else {
+                        const TOKEN = createToken(dbUser);
+                        res.cookie("TOKEN", TOKEN, cookiesOption);
+                        res.send({ username, _id:dbUser._id });
+                    }
+                }
+            });
+        }
+    });
+
+    cmd.catch(function (err) {
+        res.status(500).send("Errore esecuzione query: " + err);
+    });
+
+    cmd.finally(function () {
+        client.close();
+    })
+})
+
+app.post("/api/passwordDimenticata", async function(req,res,next){
+    const username = req.body.email
+
+    const client = new MongoClient(connectionString!)
+    await client.connect().catch(function(err){
+        res.status(503).send("Errore di connessione al dbms")
+        return
+    })
+
+    const collection = client.db(dbName).collection("utenti")
+
+    const cmd = collection.findOne({ email:username });
+
+    cmd.then(async function (dbUser) { // gli inietta l'intero record utente (compresa la password)
+        if (!dbUser)
+            res.status(401).send("Utente non registrato");
+        else {
+            console.log(dbUser)
+            const resetToken = crypto.randomBytes(32).toString('hex')
+            const expiry = new Date(Date.now() + 15 * 60 * 1000)
+
+            await collection.updateOne({ email: username}, { $set: { resetPasswordToken: resetToken, resetPasswordExpiry: expiry }})
+
+            const resetLink = `https://localhost:3001/reset-password?token=${resetToken}`
+
+
+        }
+    });
+
+    cmd.catch(function (err) {
+        res.status(500).send("Errore esecuzione query: " + err);
+    });
+
+    cmd.finally(function () {
+        client.close();
+    })
+})
+
+// Rinominata per coerenza: sendResetEmail
+async function sendResetEmail(email:string, resetLink:string) {
+    let message = fs.readFileSync("./message_reset.html", "utf-8"); // Usa un template dedicato!
+    
+    // Sostituisci i placeholder nel tuo HTML
+    message = message.replace("__user", email);
+    message = message.replace("__resetLink", resetLink); 
+
+    const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: googleOAuth
+    });
+
+    const mailOption = {
+        from: googleOAuth.user,
+        to: email,
+        subject: "Richiesta reset password - SmartLearn",
+        html: message
+        // Nota: ho rimosso gli allegati, solitamente non servono per un reset password
+    };
+
+    try {
+        const info = await transporter.sendMail(mailOption);
+        console.log("Email di reset inviata: ", info.messageId);
+    } catch (err) {
+        console.error("Errore invio email: ", err);
+        throw err; // Rilancia l'errore per gestirlo nella rotta
+    } finally {
+        transporter.close();
+    }
+}
 
 function createToken(data:any){
     //getTime restituisce il TIME UNIX in millisecondi
@@ -891,7 +1056,8 @@ app.post("/api/saveStudyData", async function(req, res) {
             pianoStudio: plan,
             testoEstratto: extractedText,
             dataCreazione: new Date(),
-            userId: new ObjectId(userId)
+            userId: new ObjectId(userId),
+            status:"active"
         });
 
         const materialId = materialResult.insertedId;
@@ -963,6 +1129,7 @@ app.use("/api", function(req:any,res,next){
 app.get("/api/getPlanQuizFlashcard", async function(req, res, next) {
   const id: any = req.query.id;
   const title:string = req.query.title as string
+  const materialId:any = req.query.materialId
   const client = new MongoClient(connectionString!);
 
   await client.connect().catch(function(err) {
@@ -975,8 +1142,8 @@ app.get("/api/getPlanQuizFlashcard", async function(req, res, next) {
 
     const [plan, quizzes, flashcards] = await Promise.all([
       db.collection("plan").findOne({ "userId": new ObjectId(id), "titolo":title }),
-      db.collection("quizzes").find({ "userId": new ObjectId(id) }).toArray(),
-      db.collection("flashcards").find({ "userId": new ObjectId(id) }).toArray()
+      db.collection("quizzes").find({ "userId": new ObjectId(id), "materialId": new ObjectId(materialId) }).toArray(),
+      db.collection("flashcards").find({ "userId": new ObjectId(id), "materialId": new ObjectId(materialId)  }).toArray()
     ]);
 
     res.send({ plan, quizzes, flashcards });
@@ -985,6 +1152,52 @@ app.get("/api/getPlanQuizFlashcard", async function(req, res, next) {
   } finally {
     client.close();
   }
+});
+
+app.get("/api/getPlans", async function(req, res, next) {
+  const id: any = req.query.userId;
+  const client = new MongoClient(connectionString!);
+
+  await client.connect().catch(function(err) {
+    res.status(503).send("Errore di connessione al dbms");
+    return;
+  });
+
+  let collection
+
+  collection = client.db(dbName).collection("plan")
+  const cmd = collection.find({userId:new ObjectId(id)}).toArray()
+
+  cmd.then(function(piani:any){
+        console.log(piani)
+        const promises = piani.map(function(piano:any) {
+                // Per ogni piano, facciamo le 2 query annidate
+                return client.db(dbName).collection("flashcards").find({userId:new ObjectId(piano.userId) ,materialId: new ObjectId(piano._id) }).toArray()
+                    .then(function(flashcards) {
+                        return client.db(dbName).collection("quizzes").find({userId:new ObjectId(piano.userId) ,materialId: new ObjectId(piano._id) }).toArray()
+                            .then(function(quiz) {
+                                // Qui uniamo i dati in un singolo oggetto
+                                return { plan: piano, quizzes: quiz, flashcards: flashcards };
+                            });
+                    });
+            });
+
+            Promise.all(promises)
+                .then(function(risultatoFinale) {
+                    res.send(risultatoFinale);
+                })
+                .catch(function(err) {
+                    res.status(500).send("Errore durante il recupero dei dati annidati: " + err);
+                })
+                .finally(function() {
+                    client.close();
+                });
+    })
+   
+    
+  cmd.catch(function(err){
+        res.status(500).send("Errore esecuzione query: " + err)
+    })
 });
 
 app.patch("/api/cambiaNextAction", async function(req, res, next) {
@@ -997,7 +1210,6 @@ app.patch("/api/cambiaNextAction", async function(req, res, next) {
     return;
   });
 
-    const db = client.db(dbName)
     const collection = client.db(dbName).collection("plan")
     const cmd = collection.findOne({userId:new ObjectId(userId),titolo:title})
 
@@ -1015,8 +1227,12 @@ app.patch("/api/cambiaNextAction", async function(req, res, next) {
         // 4. Aggiorna la nextAction usando SOLO il titolo come puntatore
         plan.pianoStudio.nextAction = nextStep
 
+        const percentualeDiCompletamento = ((currentIndex + 1) / plan.pianoStudio.timeline.length) * 100
+        const status = isLastAction ? "archived" : "active"
+
         // 5. Salva nel DB (modifica con il tuo metodo di salvataggio)
-        const cmdUpdate = collection.updateOne({userId:new ObjectId(userId)},{$set:{"pianoStudio.nextAction":plan.pianoStudio.nextAction}})
+        const cmdUpdate = collection.updateOne({userId:new ObjectId(userId), titolo:title},{$set:{"pianoStudio.nextAction":plan.pianoStudio.nextAction, 
+            "pianoStudio.mastery": percentualeDiCompletamento, status}})
 
         cmdUpdate.then(function(data){
             console.log(data)
@@ -1025,7 +1241,8 @@ app.patch("/api/cambiaNextAction", async function(req, res, next) {
             nextAction: plan.pianoStudio.nextAction,
             fullDetails: nextStep, // Inviamo anche i dettagli per aggiornare la UI
             isLastAction,
-            titoloDocumento:title
+            titoloDocumento:title,
+            materialId:plan._id
         });
         })
 
