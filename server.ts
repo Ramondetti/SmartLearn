@@ -274,7 +274,7 @@ app.post("/api/passwordDimenticata", async function(req,res,next){
 
     const collection = client.db(dbName).collection("utenti")
 
-    const cmd = collection.findOne({ email:username });
+    const cmd = collection.findOne({ username:username });
 
     cmd.then(async function (dbUser) { // gli inietta l'intero record utente (compresa la password)
         if (!dbUser)
@@ -284,10 +284,22 @@ app.post("/api/passwordDimenticata", async function(req,res,next){
             const resetToken = crypto.randomBytes(32).toString('hex')
             const expiry = new Date(Date.now() + 15 * 60 * 1000)
 
-            await collection.updateOne({ email: username}, { $set: { resetPasswordToken: resetToken, resetPasswordExpiry: expiry }})
+            const cmdUpdate = collection.updateOne({ username: username}, { $set: { resetPasswordToken: resetToken, resetPasswordExpiry: expiry }})
 
-            const resetLink = `https://localhost:3001/reset-password?token=${resetToken}`
+            cmdUpdate.then(function(data){
+                console.log(data)
+                const resetLink = `https://localhost:3001/reset-password.html?token=${resetToken}`
+                sendResetEmail(username, resetLink)
+                res.send(data)
+            })
 
+            cmdUpdate.catch(function(err){
+                res.status(500).send("Errore esecuzione 2 query: " + err);
+            })
+
+            cmdUpdate.finally(function () {
+                client.close();
+            })
 
         }
     });
@@ -295,15 +307,65 @@ app.post("/api/passwordDimenticata", async function(req,res,next){
     cmd.catch(function (err) {
         res.status(500).send("Errore esecuzione query: " + err);
     });
+})
 
-    cmd.finally(function () {
-        client.close();
+app.patch("/api/reset-password-confirmed", async function(req,res,next){
+    const token = req.body.token
+    const newPassword = req.body.nuovaPassword
+
+    const client = new MongoClient(connectionString!)
+    await client.connect().catch(function(err){
+        res.status(503).send("Errore di connessione al dbms")
+        return
     })
+
+    const collection = client.db(dbName).collection("utenti")
+
+    const cmd = collection.findOne({
+            resetPasswordToken: token,
+            resetPasswordExpiry: { $gt: new Date() }
+        });
+
+    cmd.then(async function (dbUser) { // gli inietta l'intero record utente (compresa la password)
+        if (!dbUser)
+            res.status(400).send("Link non valido o scaduto.");
+        else {
+            console.log(dbUser)
+
+            const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+            const cmdUpdate = collection.updateOne(
+            { _id: dbUser._id },
+            { 
+                $set: { password: hashedPassword },
+                $unset: { resetPasswordToken: "", resetPasswordExpiry: "" }
+            }
+        );
+
+            cmdUpdate.then(function(data){
+                console.log({"ris":"password aggiornata con successo"})
+                res.send(data)
+            })
+
+            cmdUpdate.catch(function(err){
+                res.status(500).send("Errore esecuzione 2 query: " + err);
+            })
+
+            cmdUpdate.finally(function () {
+                client.close();
+            })
+
+        }
+    });
+
+    cmd.catch(function (err) {
+        res.status(500).send("Errore esecuzione query: " + err);
+    });
 })
 
 // Rinominata per coerenza: sendResetEmail
 async function sendResetEmail(email:string, resetLink:string) {
-    let message = fs.readFileSync("./message_reset.html", "utf-8"); // Usa un template dedicato!
+    let message = fs.readFileSync("./message.html", "utf-8"); // Usa un template dedicato!
     
     // Sostituisci i placeholder nel tuo HTML
     message = message.replace("__user", email);
@@ -370,7 +432,7 @@ app.post("/api/registrazione",async function(req,res,next){
 
     const cmd = collection.insertOne({
         nome,
-        email,
+        username:email,
         "password": hashedPassword
     })
 

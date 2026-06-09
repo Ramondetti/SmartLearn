@@ -596,6 +596,8 @@ btnInviaReset.addEventListener("click",async function(){
     const response = await inviaRichiesta("POST","/passwordDimenticata",{"email":emailReset.value})
     if(response.status == 200){
         console.log(response.data)
+        resetPasswordSection.classList.add("hidden")
+        authSection.classList.remove("hidden")
     }
     else
         console.error(response.status + " : " + response.err)
