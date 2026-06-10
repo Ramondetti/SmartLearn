@@ -555,7 +555,7 @@ function backToResultsFromAIFunction(sezione){
     aiTutorSection.classList.add("hidden");
     console.log(sezione)
     if(sezione == "sezioneResults"){
-        sezioneResults.classList.remove("hidden");
+        resultsPage.classList.remove("hidden");
         return
     }
     if(sezione == "dashboard"){
@@ -638,7 +638,6 @@ async function handleSignup(event){
                 }
                 else
                     console.log("Errore: " ,getPlanResponse.err)
-
             }
             else
                 console.log("Errore: " ,responseSavement.err)
@@ -1358,7 +1357,7 @@ if (pasteContent) {
 // Drag and drop
 if (dropZoneCoreSection) {
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-        dropZone.addEventListener(eventName, (e) => {
+        dropZoneCoreSection.addEventListener(eventName, (e) => {
             e.preventDefault();
             e.stopPropagation();
         });
@@ -1571,16 +1570,12 @@ function populateStudyPlan(data) {
 
     // STATS
     pagesAnalyzed.textContent = data.stats.pagesAnalyzed;
-    keywords.textContent = data.stats.keywords;
     sessions.textContent = data.stats.sessions;
     completion.textContent = data.stats.completion;
 
     // NEXT ACTION
     nextActionTitleResultsPage.textContent = data.nextAction.title;
     nextActionDescriptionResultsPage.textContent = data.nextAction.description;
-    nextActionTimeResultsPage.textContent = data.nextAction.duration;
-    nextActionQuestionsResultsPage.textContent = data.nextAction.questions;
-    nextActionDifficoltyResultsPage.textContent = data.nextAction.difficulty;
 
     // TIMELINE
     renderTimeline(data.timeline);
@@ -1879,8 +1874,8 @@ function popolaDashboard(data) {
   nextActionDescription.textContent = plan.pianoStudio.nextAction.description
   nextActionDuration.textContent = plan.pianoStudio.nextAction.duration
   availableTime.textContent = plan.pianoStudio.estimatedTime
-  examProgress.textContent = plan.pianoStudio.mastery + "%"
-  completamento.textContent = plan.pianoStudio.mastery + "%"
+  examProgress.textContent = (plan.pianoStudio.mastery.toFixed(2)) + "%"
+  completamento.textContent = (plan.pianoStudio.mastery.toFixed(2)) + "%"
   quizCountDashboard.textContent = data.quizzes.length + " quiz"
   flashcardCountDashboard.textContent = data.flashcards.length + " flashcard"
 
@@ -1966,8 +1961,10 @@ startFlashcard.addEventListener("click",function(){
 })
 
 function aggiungiBtnFlashcard(textContent = "Torna indietro"){
-    goToQuiz.remove()
+    goToQuiz?.remove()
     goToAI.remove()
+
+    console.log(textContent)
 
     const btnBackFlashcard = document.createElement("button")
     btnBackFlashcard.textContent = textContent

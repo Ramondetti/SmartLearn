@@ -856,7 +856,7 @@ app.post("/api/create-ai-plane", upload.single("file"), async function(req, res)
                 """
 
                 ISTRUZIONI CRITICHE:
-                1. Genera quante più flashcard possibili che abbiano senso ma massimo 20
+                1. Genera quante più flashcard possibili che abbiano senso e che coprano tutto il documento
                 2. Ogni domanda deve essere chiara e specifica
                 3. Ogni risposta deve essere accurata e completa
                 4. Usa SOLO questo formato JSON (niente testo extra, niente markdown):
@@ -889,10 +889,11 @@ app.post("/api/create-ai-plane", upload.single("file"), async function(req, res)
             """
 
             ISTRUZIONI CRITICHE:
-            1. Genera quanti più quiz possibili che abbiano senso
+            1. Genera quanti più quiz possibili che abbiano senso e che coprano tutto il documento
             2. Ogni quiz deve avere 4 opzioni
             3. Solo 1 risposta corretta per quiz
             4. Usa SOLO questo formato JSON (niente testo extra, niente markdown):
+            5. Focus su concetti globali e logica. (Come se fosse un esame sul documento).
 
             [
             {"question": "Prima domanda?", "options": ["Risposta A", "Risposta B", "Risposta C", "Risposta D"], "correct": 0},
@@ -943,12 +944,15 @@ app.post("/api/create-ai-plane", upload.single("file"), async function(req, res)
             1. COMPOSIZIONE PIANO (TIMELINE):
             - Il piano dovrebbe includere tutte e 4 le tipologie di attività: 'studio', 'flashcard', 'quiz', 'exam'.
             - Struttura la timeline in modo logico: inizia con 'studio', prosegue con 'flashcard', approfondisce con 'quiz' e conclude con 'exam' per esempio.
+            - se il type é exam il titolo deve essere qualcosa come esame sul documento o simile
             - Puoi generare da 4 a 6 step totali. Se il testo è lungo, aggiungi step di 'studio' extra.
 
-            2. SPECIFICHE ATTIVITÀ:
+            2. SPECIFICHE ATTIVITÀ E STRATEGIA DIDATTICA:
             - Ogni step deve avere: day, title, description, duration, type, difficulty, priority.
             - SE tipo è 'studio' o 'mixed': includi 'content' con il TESTO INTEGRALE ORIGINALE (usa tag HTML <h3>, <p>, <code>).
             - SE tipo è 'quiz': includi 'quizList' (vettore di oggetti: {"question": "...", "options": ["A", "B", "C", "D"], "correct": 0}).
+            - La 'quizList' (Sessione Quiz) deve contenere 6-8 domande di "micro-comprensione" sui concetti tecnici specifici del testo. Servono per trovare le lacune.
+
             - SE tipo è 'flashcard': includi 'flashcardList' (vettore di oggetti: {"front": "...", "back": "..."}).
 
             3. NEXT ACTION:
