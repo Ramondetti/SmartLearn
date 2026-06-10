@@ -220,6 +220,7 @@ app.post("/api/loginWithGoogle", async function(req, res, next) {
 app.post("/api/login", async function(req,res,next){
     const username = req.body.username
     const password = req.body.password
+    const ricordami = req.body.ricordami
 
     const client = new MongoClient(connectionString!)
     await client.connect().catch(function(err){
@@ -229,7 +230,7 @@ app.post("/api/login", async function(req,res,next){
 
     const collection = client.db(dbName).collection("utenti")
 
-    const cmd = collection.findOne({ email:username });
+    const cmd = collection.findOne({ username:username });
 
     cmd.then(function (dbUser) { // gli inietta l'intero record utente (compresa la password)
         if (!dbUser)
@@ -245,7 +246,7 @@ app.post("/api/login", async function(req,res,next){
                     if (!ok)
                         res.status(401).send("Username o password non validi!")
                     else {
-                        const TOKEN = createToken(dbUser);
+                        const TOKEN = createToken(dbUser,ricordami);
                         res.cookie("TOKEN", TOKEN, cookiesOption);
                         res.send({ username, _id:dbUser._id });
                     }
@@ -395,15 +396,27 @@ async function sendResetEmail(email:string, resetLink:string) {
     }
 }
 
-function createToken(data:any){
+function createToken(data:any,ricordami:boolean=false){
+    let payload
     //getTime restituisce il TIME UNIX in millisecondi
     const now = Math.floor((new Date()).getTime()/1000)
-    const payload = {
+    if(!ricordami){
+        payload = {
         "_id": data._id,
         "username": data.username,
         "nome":data.nome,
         "iat": data.iat || now,
         "exp": now + parseInt(process.env.durata_token!)
+        }
+    }
+    else{
+        payload = {
+        "_id": data._id,
+        "username": data.username,
+        "nome":data.nome,
+        "iat": data.iat || now,
+        "exp": now + parseInt(process.env.durata_token_ricordami!)
+        }
     }
     const token = jwt.sign(payload,jwtKey)
     console.log("Creato nuovo token: ", token)
@@ -423,7 +436,7 @@ app.post("/api/registrazione",async function(req,res,next){
     })
     const collection = client.db(dbName).collection("utenti")
 
-    const existingUser = await collection.findOne({ email })
+    const existingUser = await collection.findOne({ username:email })
 
     if (existingUser) {
         client.close()
@@ -441,7 +454,14 @@ app.post("/api/registrazione",async function(req,res,next){
     })
 
     cmd.then(function(data){
-        const token = createToken(data)
+        console.log(data)
+        const newUser:any = {
+            username: email,
+            nome: nome || "",
+            password: ""
+        };
+        newUser._id = data.insertedId
+        const token = createToken(newUser)
         res.cookie("TOKEN",token,cookiesOption)
         console.log("Cookie: ", res.getHeader("set-cookie"))
         res.send({"_id":data.insertedId, "nome":nome})

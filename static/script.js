@@ -562,12 +562,17 @@ function backToResultsFromAIFunction(sezione){
         dashboard.classList.remove("hidden")
         return
     }
+    if(sezione == "studySection"){
+        studySection.classList.remove("hidden")
+        return
+    }
     resultsPage.classList.remove("hidden")
 }
 
 async function handleLogin(event){
     event.preventDefault()
-    const httResponse = await inviaRichiesta("POST","/login",{"username":loginEmail.value,"password":loginPassword.value})
+    console.log(checkboxRicordami.checked)
+    const httResponse = await inviaRichiesta("POST","/login",{"username":loginEmail.value,"password":loginPassword.value,"ricordami":checkboxRicordami.checked})
         if(httResponse.status == 200){
             console.log(httResponse.data)
             authSection.classList.add("hidden")
@@ -622,7 +627,9 @@ async function handleSignup(event){
             const responseSavement = await inviaRichiesta("POST","/saveStudyData",dataToSave)
             if(responseSavement.status == 200){
                 console.log(responseSavement.data)
-                const getPlanResponse = await inviaRichiesta("GET","/getPlan",{"id":apiResponse.data._id})
+                const getPlanResponse = await inviaRichiesta("GET","/getPlanQuizFlashcard",{"id":httResponse.data._id, title:responseSavement.data.titoloMateriale,
+                    materialId:responseSavement.data.materialId
+                })
                 if(getPlanResponse.status == 200){
                     console.log(getPlanResponse.data)
                     quizGlobal = getPlanResponse.data.quizzes
@@ -2075,7 +2082,26 @@ function renderStudyView(action) {
 
 function backToDashboard(){
     dashboard.classList.remove("hidden")
-    learningSection.classList.add("hidden")
+    studySection.classList.add("hidden")
+}
+
+function goToChatbot(){
+    studySection.classList.add("hidden")
+    aiTutorSection.classList.remove("hidden")
+
+    if (chatHistory.length === 0) {
+        showSuggestedQuestions();
+    }
+
+    backToResultsFromAI.remove()
+    const div = `<button id="backToResultsFromAI" onclick='backToResultsFromAIFunction("studySection")'
+     class="px-4 py-2 hover:bg-gray-100 text-gray-700 rounded-lg transition flex items-center gap-2">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+        </svg>
+        <span>Indietro</span>
+     </button>`
+    divPadreBackToResultsFromAI.innerHTML = div
 }
 
 async function markStudyAsComplete(){
