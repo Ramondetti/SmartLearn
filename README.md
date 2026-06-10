@@ -12,12 +12,11 @@ Piattaforma web che trasforma automaticamente gli appunti in strumenti di studio
 
 ## 🎯 Cos'è SmartLearn?
 
-SmartLearn rivoluziona il modo di studiare trasformando i tuoi appunti (PDF o foto) in:
+SmartLearn rivoluziona il modo di studiare trasformando i tuoi appunti (PDF) in:
 - 📇 **Flashcard** generate automaticamente dall'AI
 - 🎯 **Quiz** personalizzati sul contenuto
 - 🤖 **AI Tutor** che risponde alle tue domande
-- 📊 **Sistema di ripasso intelligente** con algoritmi scientifici
-- 🎮 **Sfide multiplayer** in tempo reale con gli amici
+- 📊 **Piano di studio personalizzato** generato dall'AI
 
 ---
 
@@ -26,23 +25,17 @@ SmartLearn rivoluziona il modo di studiare trasformando i tuoi appunti (PDF o fo
 ### Frontend
 - **HTML5** + **CSS3** (TailwindCSS)
 - **JavaScript** ES6+ (Vanilla, no framework)
-- **Socket.io Client** (per multiplayer real-time)
-- **Chart.js** (grafici analytics)
 
 ### Backend
 - **Node.js** v18+
 - **Express.js** (web framework)
-- **Socket.io** (WebSocket server)
 - **Multer** (file upload)
 
-### Database (Prossimamente)
-- **PostgreSQL** 15+ (database principale)
-- **pgvector** (estensione per embeddings AI)
+### Database
+- **Mongo DB** (database principale)
 
-### AI & APIs
-- **Claude API** / **Ollama** (generazione contenuti)
-- **Google Cloud Vision API** (OCR)
-- **OpenAI Embeddings** (RAG)
+### AI
+- **Gemini API** (generazione contenuti)
 
 ---
 
