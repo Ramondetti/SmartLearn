@@ -1051,6 +1051,38 @@ app.post("/api/create-ai-plane", upload.single("file"), async function(req, res)
             };
         }
 
+        const mapPrompt = `
+        Sei un motore di generazione JSON. Il tuo compito è creare una mappa concettuale partendo dal TESTO.
+        TESTO: """${extractedTextFromPdf}"""
+
+        ISTRUZIONI DI FORMATTAZIONE (OBBLIGATORIE):
+        1. PRODUCI SOLO UN OGGETTO JSON. Nessun altro testo.
+        2. Formato: {"nodes": [...], "links": [...]}
+        3. **REGOLA A CAPO**: In ogni campo "summary", è VIETATO inserire ritorni a capo reali. Se devi andare a capo, usa lo spazio o scrivi tutto su una riga.
+        4. **REGOLA VIRGOLETTE**: È VIETATO usare virgolette doppie (") all'interno dei valori dei campi. Se devi citare qualcosa, usa apici singoli (').
+        5. **REGOLA SCHEMA**: Assicurati che ogni oggetto sia separato da una virgola. Non mettere virgole dopo l'ultimo elemento di un array o di un oggetto.
+
+        STRUTTURA:
+        {
+        "nodes": [{"id": "1", "label": "Titolo", "summary": "Descrizione senza virgolette"}],
+        "links": [{"source": "1", "target": "2", "relation": "collegamento"}]
+        }
+
+        IMPORTANTE: Restituisci ESCLUSIVAMENTE un oggetto JSON valido. Non inserire markdown, non aggiungere spiegazioni testuali prima o dopo il blocco JSON.
+        `;
+
+        sendEvent(3, 98, "Generazione mappa concettuale...");
+
+        let conceptMap = null;
+        try {
+            conceptMap = await generateWithRetry(mapPrompt, 'map');
+
+            console.log(conceptMap)
+        } catch (error: any) {
+            console.error('⚠️ Mappa non generata o corrotta:', error.message);
+            conceptMap = null; // Fallback a null per evitare crash
+        }
+
         // ✅ FALLBACK: Se poche flashcard/quiz, genera minimo garantito
         if (allFlashcards.length < 3) {
             console.warn('⚠️ Too few flashcards, generating fallback...');
@@ -1087,6 +1119,7 @@ app.post("/api/create-ai-plane", upload.single("file"), async function(req, res)
         flashcard: JSON.stringify(allFlashcards),
         quiz: JSON.stringify(allQuizzes),
         plan: studyPlanData,
+        map: conceptMap,
         extractedText: extractedTextFromPdf
     })}\n\n`);
         
@@ -1130,7 +1163,7 @@ app.post("/api/saveStudyData", async function(req, res) {
         // 1. Recuperiamo i dati dal body e l'ID utente dal token (o dal body per test)
         // Assumo che tu abbia il userId disponibile (es. da un middleware di autenticazione)
         const userId = req.body.userId
-        const { extractedText, plan, flashcard, quiz } = req.body;
+        const { extractedText, plan, flashcard, quiz,map } = req.body;
 
         // 2. Parsiamo le stringhe JSON che arrivano dal frontend
         const flashcardsArray = JSON.parse(flashcard);
@@ -1170,6 +1203,14 @@ app.post("/api/saveStudyData", async function(req, res) {
         if (quizToSave.length > 0) {
             await db.collection("quizzes").insertMany(quizToSave);
         }
+
+        await db.collection("maps").insertOne({
+        materialId: materialId, // Colleghiamo la mappa al piano di studio tramite questo ID
+        userId: new ObjectId(userId),
+        nodes: map.nodes,
+        links: map.links,
+        dataCreazione: new Date()
+        });
 
         // Risposta di successo
         res.status(200).send({
@@ -1555,12 +1596,46 @@ async function generateWithRetry(
     type: string,
     maxRetries: number = 2
 ): Promise<any> {
+
+    const mapSchema = {
+    type: "OBJECT",
+    properties: {
+        nodes: {
+        type: "ARRAY",
+        items: {
+            type: "OBJECT",
+            properties: {
+            id: { type: "STRING" },
+            label: { type: "STRING" },
+            summary: { type: "STRING" }
+            },
+            required: ["id", "label", "summary"]
+        }
+        },
+        links: {
+        type: "ARRAY",
+        items: {
+            type: "OBJECT",
+            properties: {
+            source: { type: "STRING" },
+            target: { type: "STRING" },
+            relation: { type: "STRING" }
+            },
+            required: ["source", "target", "relation"]
+        }
+        }
+    },
+    required: ["nodes", "links"]
+    };
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
             console.log(`🤖 AI attempt ${attempt}/${maxRetries} for ${type}...`);
-            
-            const response = await genAI.models.generateContent({
+
+            let response
+
+            if(type != "map"){
+                response = await genAI.models.generateContent({
                 model: "gemini-flash-lite-latest",
                 contents: prompt,
                 config: {
@@ -1568,14 +1643,28 @@ async function generateWithRetry(
                     topP: 0.8,
                     topK: 40
                 }
+                });
+            }
+            else{
+                response = await genAI.models.generateContent({
+                model: "gemini-flash-lite-latest",
+                contents: prompt,
+                config: {
+                    temperature: 0.2,
+                    topP: 0.8,
+                    topK: 40,
+                    responseMimeType: "application/json", // Forza JSON,
+                    responseSchema: mapSchema
+                }
             });
+            }
             
             if (!response || !response.text) {
                 throw new Error('Empty response from AI');
             }
             
             const text = response.text.trim();
-            console.log(`📝 Raw AI response (${text.length} chars):`, text.substring(0, 200));
+            console.log(`📝 Raw AI response (${text.length} chars):`, text);
 
             // ✅ PLAN = OGGETTO JSON
             if (type === 'plan') {
@@ -1603,13 +1692,22 @@ async function generateWithRetry(
                     throw err;
                 }
             }
+            let item
 
-            // ✅ FLASHCARD / QUIZ
-            const items = extractJSON(text, type);
+            try {
+            item = extractAndParseJson(text);
+            console.log('✅ Mappa parsata con successo!');
+            return item
+        } catch (e:any) {
+            console.error('❌ Errore parsing:', e.message);
+        }
+            if(type!="map"){
+                const items = extractJSON(text, type);
 
-            if (items.length > 0) {
+                if (items.length > 0) {
                 console.log(`✅ Success: ${items.length} ${type}s extracted`);
                 return items;
+                }
             }
             
             console.warn(`⚠️ Attempt ${attempt}: No valid items extracted`);
@@ -1629,6 +1727,24 @@ async function generateWithRetry(
         }
     }
     return type === 'plan' ? null : [];
+}
+
+function extractAndParseJson(text:any) {
+    // 1. Trova l'indice del primo '{' e l'ultimo '}'
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    
+    if (start === -1 || end === -1) {
+        throw new Error("Nessun blocco JSON trovato");
+    }
+    
+    // 2. Estrai solo il contenuto compreso tra le parentesi
+    const jsonString = text.substring(start, end + 1);
+    
+    // 3. Pulisci eventuali caratteri di controllo invisibili che rompono JSON.parse
+    const cleanJson = jsonString.replace(/[\u0000-\u001F\u007F-\u009F]/g, "");
+    
+    return JSON.parse(cleanJson);
 }
 
 // Aggiungi questa funzione nel tuo file

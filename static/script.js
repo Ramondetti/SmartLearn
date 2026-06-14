@@ -10,6 +10,8 @@ let viewMode = "single";
 let dataToSave
 let quizPlanFlashcard
 let currentPlan
+let currentMap
+let cy //mappa
 const googleClientId = "99632147794-fuhq76pci5hk7dh2uglkeddcs7fjqjpc.apps.googleusercontent.com";
 
 // ============================================
@@ -610,7 +612,9 @@ btnInviaReset.addEventListener("click",async function(){
 
 btnNuovoPiano.addEventListener("click",function(){
     pianiSection.classList.add("hidden")
-    showUploadForm()
+    onboardingSection.classList.remove("hidden")
+    step0.classList.remove("hidden")
+    processingUpdates.innerHTML = ""
 })
 
 async function handleSignup(event){
@@ -1813,6 +1817,95 @@ function openAITutor() {
         <span>Indietro</span>
      </button>`
     divPadreBackToResultsFromAI.innerHTML = div
+}
+
+function initCytoscape(conceptMap) {
+  // Trasforma il JSON del server nel formato "elements" di Cytoscape
+  const elements = [
+    ...conceptMap.nodes.map(n => ({
+      data: { id: n.id, label: n.label, summary: n.summary }
+    })),
+    ...conceptMap.links.map(l => ({
+      data: { source: l.source, target: l.target, label: l.relation }
+    }))
+  ];
+
+  cy = cytoscape({
+    container: document.getElementById('cy'), // Il tuo div sezione
+    elements: elements,
+    style: [
+  {
+    selector: 'node',
+    style: {
+      'shape': 'round-rectangle',      // Forma rettangolare con angoli arrotondati
+      'background-color': '#ffffff',   // Sfondo bianco
+      'border-width': 2,
+      'border-color': '#4f46e5',       // Bordo colorato
+      'label': 'data(label)',
+      'color': '#000000',              // TESTO NERO
+      'text-valign': 'center',
+      'text-halign': 'center',
+      'font-size': '14px',
+      'font-weight': 'bold',
+      'padding': '15px',               // Spazio interno per far respirare il testo
+      'width': 'label',                // LA MAGIA: la larghezza si adatta al testo
+      'height': 'label',               // LA MAGIA: l'altezza si adatta al testo
+      'text-wrap': 'wrap',             // Va a capo se il testo è troppo lungo
+      'text-max-width': '120px'        // Limita la larghezza massima per evitare nodi giganti
+    }
+  },
+  {
+    selector: 'edge',
+    style: {
+      'width': 2,
+      'line-color': '#94a3b8',
+      'target-arrow-color': '#94a3b8',
+      'target-arrow-shape': 'triangle',
+      'curve-style': 'bezier',
+      'label': 'data(label)',          // Mostra la relazione sulla linea
+      'text-background-color': '#ffffff',
+      'text-background-opacity': 1,
+      'color': '#000000'               // Testo relazione nero
+    }
+  }
+],
+    layout: {
+      name: 'cose', // Layout dinamico ottimo per le mappe concettuali
+      animate: true
+    }
+  });
+
+  // Aggiungi interattività: click sul nodo
+  cy.on('tap', 'node', function(evt) {
+    const node = evt.target;
+    console.log("Dettaglio: " + node.data('summary'));
+  });
+}
+
+function showConceptMap(){
+    resultsPage.classList.add("hidden")
+    mapSection.classList.remove("hidden")
+    initCytoscape(dataToSave.map)
+}
+
+function closeMap(from){
+    if(from == "dashboard")
+        dashboard.classList.remove("hidden")
+    else
+        resultsPage.classList.remove("hidden")
+    mapSection.classList.add("hidden")
+}
+
+function showMapFromDashboard(){
+    dashboard.classList.add("hidden")
+    mapSection.classList.remove("hidden")
+    divPadreMapSectionBtn.innerHTML = `
+    <h2 class="text-xl font-bold text-gray-800">Mappa Concettuale</h2>
+    <button onclick="closeMap('dashboard')" class="text-gray-400 hover:cursor-pointer hover:text-gray-600 transition-colors">
+        ✕ Chiudi
+    </button>
+    `
+    initCytoscape(dataToSave.map)
 }
 
 function handleGoogleAuth(){

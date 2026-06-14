@@ -143,3 +143,9 @@ animation: l3 1s infinite linear;
     cursor: pointer;
     transition: background-color 0.2s ease;
 }
+
+#cy {
+    width: 100% !important;
+    height: 600px !important; /* Forza l'altezza qui */
+    min-height: 600px !important;
+}
