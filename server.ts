@@ -17,6 +17,7 @@ import cookieParser from "cookie-parser"
 import Tesseract, { createWorker } from 'tesseract.js';
 import nodemailer from "nodemailer"
 import crypto from "crypto"
+import FormData from 'form-data';
 
 const app = express()
 dotenv.config({path:".env"})
@@ -518,11 +519,11 @@ app.post("/api/upload", upload.single("file"), async function(req, res) {
         try {
             if (mimeType!.startsWith('image/')) {
                 sendEvent(1, 15, "🔍 Riconoscimento testo con OCR...");
+                extractedTextFromPdf = await ocrSpace(filePath);
             } else {
                 sendEvent(1, 15, "Estrazione testo in corso...");
+                extractedTextFromPdf = await extractText(filePath, mimeType!);
             }
-            
-            extractedTextFromPdf = await extractText(filePath, mimeType!);
             
             if (!extractedTextFromPdf || extractedTextFromPdf.length < 50) {
                 throw new Error('Testo estratto insufficiente. Assicurati che il documento contenga testo leggibile.');
@@ -809,12 +810,16 @@ app.post("/api/create-ai-plane", upload.single("file"), async function(req, res)
         
         try {
             if (mimeType!.startsWith('image/')) {
-                sendEvent(1, 15, "🔍 Riconoscimento testo con OCR...");
-            } else {
-                sendEvent(1, 15, "Estrazione testo in corso...");
-            }
-            
+            // Caso Immagine: usa OCR
+            sendEvent(1, 20, "🔍 Riconoscimento testo (OCR) in corso...");
+            extractedTextFromPdf = await ocrSpace(filePath);
+            } else if (mimeType === 'application/pdf') {
+            // Caso PDF: usa la tua funzione di estrazione standard
+            sendEvent(1, 20, "📄 Estrazione testo da PDF...");
             extractedTextFromPdf = await extractText(filePath, mimeType!);
+            } else {
+            throw new Error("Tipo file non supportato per l'estrazione.");
+            }
             
             if (!extractedTextFromPdf || extractedTextFromPdf.length < 50) {
                 throw new Error('Testo estratto insufficiente. Assicurati che il documento contenga testo leggibile.');
@@ -1391,6 +1396,51 @@ app.get("/api/checkToken",async function(req,res,next){
     console.log(req.cookies)
     res.send({"token":req.cookies.TOKEN})
 })
+
+async function ocrSpace(filePath: string): Promise<string> {
+    const form = new FormData();
+    form.append("apikey", process.env.OCR_API_KEY!);
+    form.append("language", "ita");
+    form.append("isOverlayRequired", "false");
+    form.append("scale", "true");
+    form.append("file", fs.createReadStream(filePath));
+
+    return new Promise((resolve, reject) => {
+        const request = https.request({
+            hostname: 'api.ocr.space',
+            path: '/parse/image',
+            method: 'POST',
+            headers: form.getHeaders() // Qui il boundary è gestito nativamente
+        }, (res) => {
+            let responseData = '';
+            res.on('data', (chunk) => responseData += chunk);
+            res.on('end', () => {
+            const data = JSON.parse(responseData);
+            
+            // LOG DI DEBUG PER CAPIRE COSA VEDE L'OCR
+            console.log("🔍 Risposta API OCR completa:", JSON.stringify(data, null, 2));
+
+            if (data.IsErroredOnProcessing) {
+                reject(new Error(`OCR API: ${data.ErrorMessage}`));
+            } else if (data.ParsedResults && data.ParsedResults.length > 0) {
+                const text = data.ParsedResults[0].ParsedText;
+                if (!text || text.trim().length < 50) {
+                    reject(new Error("Testo estratto troppo breve (inferiore a 50 caratteri). L'immagine è leggibile?"));
+                } else {
+                    resolve(text);
+                }
+            } else {
+                reject(new Error("OCR non ha restituito risultati (ParsedResults vuoto)."));
+            }
+        });
+        });
+
+        request.on('error', (err) => reject(err));
+
+        // Colleghiamo lo stream del file direttamente alla richiesta
+        form.pipe(request);
+    });
+}
 
 // ============================================
 // EXTRACT JSON - VERSIONE SUPER ROBUSTA

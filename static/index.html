@@ -123,19 +123,14 @@
             <div id="uploadArea" class="space-y-6">
           <!-- Drop Zone -->
           <div id="dropZone" class="group border-2 border-dashed border-gray-300 rounded-xl p-12 text-center bg-linear-to-br from-gray-50 to-white hover:border-indigo-400 hover:bg-indigo-50/30 transition-all duration-300 cursor-pointer relative">
-            <!-- Hidden File Input -->
             <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png" class="hidden"/>
             <div class="text-6xl mb-4 group-hover:scale-110 transition-transform duration-300">📄</div>
-            <p class="text-gray-700 font-semibold text-lg mb-2">Trascina i tuoi appunti qui per un'anteprima</p>
-            <p class="text-sm text-gray-500">PDF • Max 10MB</p>
-            <!-- Button che apre file selector -->
-            <button 
-              type="button"
-              id="selectFileBtn"
-              class="hover:cursor-pointer mt-4 bg-indigo-600 text-white px-6 py-2 rounded-full text-sm font-semibold hover:bg-indigo-700 transition">
-              Oppure Seleziona File
+            <p class="text-gray-700 font-semibold text-lg mb-2">Trascina PDF o Immagini qui per iniziare</p>
+            <p class="text-sm text-gray-500">PDF, JPG, PNG • Max 10MB</p>
+            <button type="button" id="selectFileBtn" class="hover:cursor-pointer mt-4 bg-indigo-600 text-white px-6 py-2 rounded-full text-sm font-semibold hover:bg-indigo-700 transition">
+                Oppure Seleziona File
             </button>
-          </div>
+           </div>
           <!-- File Preview (nascosto di default) -->
           <!-- Info Cards -->
           <div class="grid grid-cols-3 gap-3">
@@ -180,11 +175,11 @@
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         <!-- Feature 1 -->
         <div class="group bg-linear-to-br from-blue-50 to-indigo-50 rounded-2xl p-8 hover:shadow-2xl hover:-translate-y-2 transition duration-300 border border-blue-100">
-          <div class="text-5xl mb-4 group-hover:scale-110 transition-transform">📤</div>
-          <h3 class="text-2xl font-bold text-gray-900 mb-3">Upload Intelligente</h3>
-          <p class="text-gray-600 leading-relaxed mb-4">
-            Carica i tuoi documenti o appunti in formato PDF. Il sistema processa i file per rendere i contenuti pronti allo studio immediato.
-          </p>
+            <div class="text-5xl mb-4 group-hover:scale-110 transition-transform">📤</div>
+            <h3 class="text-2xl font-bold text-gray-900 mb-3">Upload Intelligente</h3>
+            <p class="text-gray-600 leading-relaxed mb-4">
+                Carica i tuoi documenti in formato <strong>PDF o immagini (JPG, PNG)</strong>. Il nostro sistema riconosce il testo presente nei file per preparare le tue sessioni di studio.
+            </p>
         </div>
         <!-- Feature 2 -->
         <div class="group bg-linear-to-br from-purple-50 to-pink-50 rounded-2xl p-8 hover:shadow-2xl hover:-translate-y-2 transition duration-300 border border-purple-100">
@@ -243,7 +238,7 @@
           </div>
           <h3 class="text-2xl font-bold mb-3">Carica Appunti</h3>
           <p class="text-indigo-100 leading-relaxed">
-            Carica i tuoi documenti PDF in modo rapido. Il sistema acquisisce il testo e lo organizza perfettamente per le sessioni di studio.
+            Carica in modo rapido i tuoi <strong>PDF o foto degli appunti</strong>. L'AI estrarrà il testo da qualsiasi formato per organizzare il tuo studio.
           </p>
         </div>
         <!-- Step 2 -->
@@ -384,6 +379,7 @@
                     <li>✓ Finito completamento del piano</li>
                     <li>✓ Gestito caricamento di un nuovo materiale dopo completamento del primo piano</li>
                     <li>✓ Gestito login</li>
+                    <li>✓ Implementato OCR</li>
                   </ul>
                 </div>
               </div>
@@ -563,7 +559,7 @@
                         </span>
                     </h1>
                     <p class="text-lg text-gray-600 max-w-2xl mx-auto">
-                        Carica il tuo materiale PDF e in 30 secondi avrai flashcard, quiz e un piano di studio personalizzato.
+                        Carica il tuo materiale PDF o immagine e in 30 secondi avrai flashcard, quiz e un piano di studio personalizzato.
                     </p>
                 </div>
 
@@ -593,7 +589,10 @@
                                 <!-- File Types -->
                                 <div class="flex items-center justify-center gap-3 mb-8 flex-wrap">
                                     <span class="px-4 py-2 bg-white rounded-full shadow-sm border border-gray-200 text-sm font-semibold text-gray-700">📄 PDF</span>
+                                    <span class="px-4 py-2 bg-white rounded-full shadow-sm border border-gray-200 text-sm font-semibold text-gray-700">🖼️ JPG</span>
+                                    <span class="px-4 py-2 bg-white rounded-full shadow-sm border border-gray-200 text-sm font-semibold text-gray-700">🖼️ PNG</span>
                                 </div>
+                                
 
                                 <button type="button" class="hover:cursor-pointer px-8 py-4 bg-linear-to-r from-indigo-600 to-purple-600 text-white font-bold rounded-full shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all">
                                     Seleziona File

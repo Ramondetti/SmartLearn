@@ -94,6 +94,15 @@ selectFileBtn.addEventListener('click', (e) => {
 fileInput.addEventListener('change', (e) => {
   const file = e.target.files[0];
   if (file) {
+    divPadreBackToResultsFromAI.innerHTML = `
+    <button id="backToResultsFromAI" onclick="backToResultsFromAIFunction('sezioneResultsPreview')"
+        class="px-4 py-2 hover:bg-gray-100 text-gray-700 rounded-lg transition flex items-center gap-2">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+        </svg>
+        <span>Indietro</span>
+    </button>
+    `
     handleFile(file);
     homepage.classList.add("hidden");
     sezioneResults.classList.remove("hidden");
@@ -568,7 +577,7 @@ function backToResultsFromAIFunction(sezione){
         studySection.classList.remove("hidden")
         return
     }
-    resultsPage.classList.remove("hidden")
+    sezioneResults.classList.remove("hidden")
 }
 
 async function handleLogin(event){
@@ -1200,7 +1209,7 @@ function closeCardModal() {
 if (newUploadBtn) {
   newUploadBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    fileInputCore.click();
+    fileInput.click();
   });
 }
 
@@ -1809,7 +1818,7 @@ function openAITutor() {
     }
 
     backToResultsFromAI.remove()
-    const div = `<button id="backToResultsFromAI" onclick='backToResultsFromAIFunction("result")'
+    const div = `<button id="backToResultsFromAI" onclick='backToResultsFromAIFunction("sezioneResults")'
      class="px-4 py-2 hover:bg-gray-100 text-gray-700 rounded-lg transition flex items-center gap-2">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
